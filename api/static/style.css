@@ -134,11 +134,18 @@ h4 { font-size: 0.875rem; text-transform: uppercase; letter-spacing: 0.04em; col
 .sidebar-brand-icon {
   width: 36px;
   height: 36px;
-  background: var(--lh-500);
+  background: #ffffff;
   border-radius: 8px;
   display: grid;
   place-items: center;
   flex-shrink: 0;
+  overflow: hidden;
+}
+
+.sidebar-brand-icon img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
 }
 
 .sidebar-brand-icon svg {
@@ -328,6 +335,69 @@ h4 { font-size: 0.875rem; text-transform: uppercase; letter-spacing: 0.04em; col
   flex: 1;
   padding: var(--sp-5) var(--sp-6);
   max-width: 1400px;
+}
+
+/* ── Papeleta download bar ───────────────────────────────────── */
+.papeleta-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-4);
+  padding: var(--sp-4) var(--sp-5);
+  background: linear-gradient(135deg, var(--lh-50) 0%, var(--surface-raised) 100%);
+  border: 1px solid var(--lh-200, var(--border));
+  border-radius: 10px;
+  margin-bottom: var(--sp-4);
+  flex-wrap: wrap;
+}
+
+.papeleta-bar-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.papeleta-bar-title {
+  font-weight: 700;
+  font-size: 0.95rem;
+  color: var(--lh-900);
+}
+
+.papeleta-bar-sub {
+  font-size: 0.8125rem;
+  color: var(--text-muted);
+}
+
+.papeleta-bar-controls {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  flex-wrap: wrap;
+}
+
+.papeleta-bar .filter-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.papeleta-bar .filter-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.papeleta-bar-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.8125rem;
+  color: var(--text-muted);
+  cursor: pointer;
+  user-select: none;
+}
+
+.papeleta-bar-toggle input {
+  accent-color: var(--lh-600);
 }
 
 /* ── Filters bar ──────────────────────────────────────────────── */
@@ -1522,7 +1592,7 @@ h4 { font-size: 0.875rem; text-transform: uppercase; letter-spacing: 0.04em; col
 .login-body {
   margin: 0;
   min-height: 100vh;
-  background: linear-gradient(135deg, var(--lh-50) 0%, var(--lh-100) 100%);
+  background: url('/static/login.jpg') center/cover no-repeat fixed;
   font-family: 'Archivo', system-ui, sans-serif;
   color: var(--text-primary);
 }
@@ -1532,6 +1602,7 @@ h4 { font-size: 0.875rem; text-transform: uppercase; letter-spacing: 0.04em; col
   display: grid;
   place-items: center;
   padding: var(--sp-5);
+  background: linear-gradient(135deg, oklch(0.20 0.05 145 / 0.45) 0%, oklch(0.30 0.08 145 / 0.35) 100%);
 }
 
 .login-card {
@@ -1541,7 +1612,7 @@ h4 { font-size: 0.875rem; text-transform: uppercase; letter-spacing: 0.04em; col
   border: 1px solid var(--border);
   border-radius: 14px;
   padding: var(--sp-5) var(--sp-5) var(--sp-5);
-  box-shadow: 0 10px 40px -10px oklch(0.20 0.05 145 / 0.15);
+  box-shadow: 0 20px 60px -15px oklch(0.15 0.05 145 / 0.45);
 }
 
 .login-brand {
@@ -1553,14 +1624,16 @@ h4 { font-size: 0.875rem; text-transform: uppercase; letter-spacing: 0.04em; col
 
 .login-brand-icon {
   width: 48px;
-  height: 34px;
+  height: 48px;
   display: grid;
   place-items: center;
 }
 
+.login-brand-icon img,
 .login-brand-icon svg {
   width: 100%;
   height: 100%;
+  object-fit: contain;
 }
 
 .login-brand-text {

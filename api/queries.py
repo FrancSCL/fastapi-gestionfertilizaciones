@@ -675,6 +675,41 @@ def get_sectores(id_cuartel: int) -> list:
 
 # ── Bodega (por semana) ───────────────────────────────────────────────────────
 
+def get_semanas_disponibles(
+    id_temporada: int | None = None,
+    id_sucursal: int | None = None,
+) -> list:
+    """Retorna las etiquetas de semana que tienen programas, opcionalmente filtrado."""
+    suc_ph = ",".join(["%s"] * len(SUCURSALES_VISIBLES))
+    where = [f"suc.id IN ({suc_ph})"]
+    params: list = list(SUCURSALES_VISIBLES)
+
+    if id_temporada:
+        where.append("prog.id_temporada = %s")
+        params.append(id_temporada)
+    if id_sucursal:
+        where.append("suc.id = %s")
+        params.append(id_sucursal)
+
+    sql = f"""
+        SELECT DISTINCT
+            sem.etiqueta_semana,
+            sem.semana_calendario,
+            sem.fecha_inicio,
+            sem.fecha_fin
+        FROM FACT_AREATECNICA_FERTILIZACION_PROGRAMA prog
+        JOIN DIM_GENERAL_CECO             ceco ON ceco.id = prog.id_cuartel
+        JOIN DIM_GENERAL_SUCURSAL         suc  ON suc.id  = ceco.id_sucursal
+        JOIN DIM_GENERAL_SEMANASTEMPORADA sem  ON sem.id  = prog.semana
+        WHERE {' AND '.join(where)}
+        ORDER BY sem.fecha_inicio DESC
+    """
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(sql, params)
+            return cur.fetchall()
+
+
 def get_programas_semana(etiqueta_semana: str) -> list:
     sql = """
         SELECT

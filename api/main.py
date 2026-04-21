@@ -10,7 +10,7 @@ from starlette.middleware.sessions import SessionMiddleware
 
 from .queries import (
     get_programa, get_productos, get_sectores,
-    get_programas_semana, get_productos_multiples, get_sectores_multiples,
+    get_programas_semana, get_semanas_disponibles, get_productos_multiples, get_sectores_multiples,
     get_temporadas, get_sucursales,
     listar_cuarteles_con_programas, agrupar_por_sucursal,
     get_cuartel_info, get_semanas_cuartel, get_productos_asignados, build_matriz,
@@ -129,6 +129,7 @@ def web_programas(request: Request, temporada: int | None = None, sucursal: int 
     temporadas = get_temporadas()
     cuarteles = listar_cuarteles_con_programas(id_temporada=temporada, id_sucursal=sucursal)
     grupos = agrupar_por_sucursal(cuarteles)
+    semanas = get_semanas_disponibles(id_temporada=temporada, id_sucursal=sucursal)
     return templates.TemplateResponse(
         "programas.html",
         {
@@ -140,6 +141,7 @@ def web_programas(request: Request, temporada: int | None = None, sucursal: int 
             "total_cuarteles": len(cuarteles),
             "filtro_temporada": temporada,
             "filtro_sucursal": sucursal,
+            "semanas": semanas,
         },
     )
 

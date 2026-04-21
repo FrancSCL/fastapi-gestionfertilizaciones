@@ -4,6 +4,32 @@
 {% block topbar_title %}Programas de Fertilización{% endblock %}
 
 {% block content %}
+<div class="papeleta-bar">
+  <div class="papeleta-bar-info">
+    <span class="papeleta-bar-title">Descargar papeleta semanal</span>
+    <span class="papeleta-bar-sub">PDF con todos los programas de la semana seleccionada</span>
+  </div>
+  <div class="papeleta-bar-controls">
+    <select class="filter-select" id="papeleta-semana">
+      <option value="">Selecciona semana…</option>
+      {% for s in semanas %}
+      <option value="{{ s.etiqueta_semana }}">{{ s.etiqueta_semana }}</option>
+      {% endfor %}
+    </select>
+    <button type="button" class="filter-btn" id="papeleta-download" disabled>
+      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+        <polyline points="7 10 12 15 17 10"/>
+        <line x1="12" y1="15" x2="12" y2="3"/>
+      </svg>
+      Descargar
+    </button>
+    <label class="papeleta-bar-toggle">
+      <input type="checkbox" id="papeleta-pro"> Versión pro
+    </label>
+  </div>
+</div>
+
 <form class="filters" method="get" action="/app/programas">
   <div class="filter-group">
     <label class="filter-label" for="temporada">Temporada</label>
@@ -27,6 +53,25 @@
 
   <button type="submit" class="filter-btn">Aplicar</button>
 </form>
+
+<script>
+(function() {
+  const select = document.getElementById('papeleta-semana');
+  const btn = document.getElementById('papeleta-download');
+  const pro = document.getElementById('papeleta-pro');
+
+  select.addEventListener('change', () => {
+    btn.disabled = !select.value;
+  });
+
+  btn.addEventListener('click', () => {
+    if (!select.value) return;
+    const etiqueta = encodeURIComponent(select.value);
+    const suffix = pro.checked ? '?pro=true' : '';
+    window.location.href = `/registro-semanal/${etiqueta}${suffix}`;
+  });
+})();
+</script>
 
 <div class="data-table-wrap">
   <div class="data-table-header">
