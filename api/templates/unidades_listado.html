@@ -1,0 +1,121 @@
+{% extends "base.html" %}
+
+{% block title %}Unidades Requeridas{% endblock %}
+{% block topbar_title %}Unidades Requeridas{% endblock %}
+
+{% block content %}
+<form class="filters" method="get" action="/app/unidades-requeridas">
+  <div class="filter-group">
+    <label class="filter-label" for="estado">Estado</label>
+    <select class="filter-select" id="estado" name="estado">
+      <option value="sin_ur" {% if filtro_estado == 'sin_ur' %}selected{% endif %}>Sin UR (pendientes)</option>
+      <option value="con_ur" {% if filtro_estado == 'con_ur' %}selected{% endif %}>Con UR creada</option>
+      <option value="todos"  {% if filtro_estado == 'todos'  %}selected{% endif %}>Todos</option>
+    </select>
+  </div>
+
+  <div class="filter-group">
+    <label class="filter-label" for="temporada">Temporada</label>
+    <select class="filter-select" id="temporada" name="temporada">
+      <option value="">Todas las temporadas</option>
+      {% for t in temporadas %}
+      <option value="{{ t.id }}" {% if filtro_temporada == t.id %}selected{% endif %}>{{ t.temporada }}</option>
+      {% endfor %}
+    </select>
+  </div>
+
+  <div class="filter-group">
+    <label class="filter-label" for="sucursal">Sucursal</label>
+    <select class="filter-select" id="sucursal" name="sucursal">
+      <option value="">Todas las sucursales</option>
+      {% for s in sucursales %}
+      <option value="{{ s.id }}" {% if filtro_sucursal == s.id %}selected{% endif %}>{{ s.sucursal }}</option>
+      {% endfor %}
+    </select>
+  </div>
+
+  <button type="submit" class="filter-btn">Aplicar</button>
+</form>
+
+<div class="data-table-wrap">
+  <div class="data-table-header">
+    <h2>
+      {% if filtro_estado == 'sin_ur' %}Cuarteles pendientes de UR
+      {% elif filtro_estado == 'con_ur' %}Cuarteles con UR creada
+      {% else %}Todos los cuarteles{% endif %}
+    </h2>
+    <span class="data-table-count">{{ total_cuarteles }} cuartel{% if total_cuarteles != 1 %}es{% endif %}</span>
+  </div>
+
+  {% if grupos %}
+    {% for g in grupos %}
+    <section class="sucursal-group">
+      <header class="sucursal-group-header">
+        <span class="sucursal-group-name">{{ g.sucursal }}</span>
+        <span class="sucursal-group-count">{{ g.cuarteles|length }} cuartel{% if g.cuarteles|length != 1 %}es{% endif %}</span>
+      </header>
+
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Cuartel</th>
+            <th>Variedad</th>
+            <th>Portainjerto</th>
+            <th class="num">Sup. Productiva</th>
+            <th class="num">Semanas</th>
+            <th>Estado</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for c in g.cuarteles %}
+          <tr>
+            <td class="cuartel-name">{{ c.cuartel }}</td>
+            <td>
+              {% if c.variedad %}<span class="tag">{{ c.variedad }}</span>{% else %}<span class="sup-unit">—</span>{% endif %}
+            </td>
+            <td>
+              {% if c.portainjerto %}<span class="tag">{{ c.portainjerto }}</span>{% else %}<span class="sup-unit">—</span>{% endif %}
+            </td>
+            <td class="num">
+              <span class="sup-value">{{ '%.2f' | format(c.sup_productiva | float) }}</span><span class="sup-unit">ha</span>
+            </td>
+            <td class="num">
+              <span class="sup-value">{{ c.num_programas }}</span>
+            </td>
+            <td>
+              {% if c.tiene_ur %}
+                <span class="badge badge-ok">UR creada</span>
+              {% else %}
+                <span class="badge badge-missing">Pendiente</span>
+              {% endif %}
+            </td>
+            <td>
+              {% if c.tiene_ur %}
+                <a href="/app/unidades/{{ c.id_cuartel }}" class="filter-btn filter-btn-ghost" style="text-decoration:none;">Recalcular</a>
+              {% else %}
+                <a href="/app/unidades/{{ c.id_cuartel }}" class="filter-btn" style="text-decoration:none;">Crear UR</a>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </section>
+    {% endfor %}
+  {% else %}
+  <div class="empty-state">
+    <svg class="empty-state-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
+         fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M9 11l3 3L22 4"/>
+      <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
+    </svg>
+    <p class="empty-state-text">
+      {% if filtro_estado == 'sin_ur' %}No hay cuarteles pendientes — todos tienen UR creada.
+      {% elif filtro_estado == 'con_ur' %}No hay cuarteles con UR para los filtros seleccionados.
+      {% else %}No hay cuarteles para los filtros seleccionados.{% endif %}
+    </p>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+
+{% block title %}Parámetros{% endblock %}
+{% block topbar_title %}Parámetros{% endblock %}
+
+{% block content %}
+<div class="params-layout">
+
+  <!-- Vigor -->
+  <section class="data-table-wrap">
+    <div class="data-table-header">
+      <h2>Vigor</h2>
+    </div>
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Vigor</th>
+          <th class="num">Factor</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for v in vigores %}
+        <tr>
+          <form method="post" action="/app/parametros/vigor" style="display:contents">
+            <input type="hidden" name="id" value="{{ v.id }}">
+            <td><input class="param-input" type="text" name="vigor" value="{{ v.vigor }}" required></td>
+            <td class="num"><input class="param-input param-input-num" type="number" step="0.01" name="factor" value="{{ v.factor }}" required></td>
+            <td><button class="param-save-btn" type="submit">Guardar</button></td>
+          </form>
+        </tr>
+        {% endfor %}
+        <tr class="param-new-row">
+          <form method="post" action="/app/parametros/vigor" style="display:contents">
+            <td><input class="param-input" type="text" name="vigor" placeholder="Nuevo vigor" required></td>
+            <td class="num"><input class="param-input param-input-num" type="number" step="0.01" name="factor" placeholder="1.0" required></td>
+            <td><button class="param-save-btn param-add-btn" type="submit">+ Agregar</button></td>
+          </form>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- Factores por especie -->
+  <section class="data-table-wrap">
+    <div class="data-table-header">
+      <h2>Factores por especie (unidades / ton)</h2>
+    </div>
+    <div style="overflow-x:auto;">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Fertilizante</th>
+            <th class="num">Uva</th>
+            <th class="num">Cereza</th>
+            <th class="num">Ciruela</th>
+            <th class="num">Nectarín</th>
+            <th class="num">Durazno</th>
+            <th class="num">Damasco</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for f in factores %}
+          <tr>
+            <form method="post" action="/app/parametros/factor/{{ f.id }}" style="display:contents">
+              <td class="cuartel-name">{{ f.fertilizante }}</td>
+              {% for col in ['factor_uva','factor_cereza','factor_ciruela','factor_nectarin','factor_durazno','factor_damasco'] %}
+              <td class="num"><input class="param-input param-input-num" type="number" step="0.01" name="{{ col }}" value="{{ f[col] or 0 }}"></td>
+              {% endfor %}
+              <td><button class="param-save-btn" type="submit">Guardar</button></td>
+            </form>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+</div>
+{% endblock %}

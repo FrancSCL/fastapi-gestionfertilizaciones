@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Papeleta Fertilización – La Hornilla</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: Arial, sans-serif;
+    font-size: 10px;
+    color: #2c2c2c;
+    background: #fff;
+    padding: 0;
+  }
+
+  .page {
+    background: #fff;
+    max-width: 1240px;
+    margin: 0 auto;
+    padding: 10px 14px 14px;
+  }
+
+  /* ── HEADER ── */
+  .header {
+    display: grid;
+    grid-template-columns: 110px 1fr 210px;
+    align-items: center;
+    border-bottom: 3px solid #4a7c3f;
+    padding-bottom: 8px;
+    margin-bottom: 8px;
+    gap: 12px;
+  }
+
+  .logo-box { display: flex; flex-direction: column; align-items: center; }
+  .logo-text-lh { font-size: 22px; font-weight: 800; color: #3a3a3a; letter-spacing: 2px; line-height: 1; }
+  .logo-text-fruits { font-size: 8px; font-weight: 700; color: #6ba348; letter-spacing: 4px; text-transform: uppercase; }
+
+  .header-title { text-align: center; }
+  .header-title h1 { font-size: 14px; font-weight: 800; color: #2d5a1f; text-transform: uppercase; letter-spacing: 0.8px; }
+  .header-title p { font-size: 8.5px; color: #666; margin-top: 2px; font-style: italic; }
+
+  .header-meta { font-size: 9px; line-height: 1.75; color: #444; background: #f4faf1; border: 1px solid #c5d9bb; border-radius: 4px; padding: 6px 10px; }
+  .header-meta .orden-num { font-size: 12px; font-weight: 800; color: #2d5a1f; margin-bottom: 1px; }
+
+  /* ── SECTION TITLES ── */
+  .section-title {
+    background: #4a7c3f;
+    color: #fff;
+    font-size: 9.5px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    padding: 4px 10px;
+    margin: 8px 0 4px;
+  }
+
+  /* ── DETALLES GENERALES ── */
+  .detalles-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 2px 16px;
+    padding: 2px 0 4px;
+  }
+
+  .field-row {
+    display: flex;
+    align-items: baseline;
+    gap: 5px;
+    border-bottom: 1px dotted #ddd;
+    padding: 2px 0;
+  }
+
+  .field-label { font-weight: 700; color: #2d5a1f; white-space: nowrap; font-size: 8px; min-width: 90px; }
+  .field-value { font-size: 9px; color: #2c2c2c; flex: 1; }
+
+  /* ── TABLES ── */
+  table { width: 100%; border-collapse: collapse; font-size: 8.5px; }
+
+  th {
+    background: #3d6e34;
+    color: #fff;
+    padding: 4px 5px;
+    text-align: center;
+    font-weight: 700;
+    text-transform: uppercase;
+    font-size: 7.5px;
+    border: 1px solid #2e5528;
+    line-height: 1.3;
+  }
+
+  td {
+    padding: 4px 5px;
+    border: 1px solid #c5d9bb;
+    vertical-align: middle;
+    color: #2c2c2c;
+    line-height: 1.3;
+  }
+
+  tr:nth-child(even) td { background: #eef7e9; }
+  tr:nth-child(odd)  td { background: #fff; }
+
+  td.center { text-align: center; }
+  td.right  { text-align: right; }
+  td.bold   { font-weight: 700; }
+  td.blank  { background: #fff !important; height: 18px; }
+  td.blank-sm { background: #fff !important; height: 14px; }
+
+  /* ── SECTOR BADGE ── */
+  .sector-badge {
+    display: inline-block;
+    background: #2d5a1f;
+    color: #fff;
+    font-weight: 700;
+    font-size: 7.5px;
+    padding: 1px 6px;
+    border-radius: 3px;
+  }
+
+  .sector-a td { background: #f0f8eb !important; }
+  .sector-b td { background: #e3f2db !important; }
+  .sector-c td { background: #d6eccc !important; }
+  .sector-d td { background: #c9e6bd !important; }
+
+  /* ── TOTALES ROW ── */
+  .totales-row td {
+    background: #b8dca4 !important;
+    font-weight: 700;
+    color: #1a3a10;
+    border-top: 2px solid #4a7c3f;
+  }
+
+  /* ── SACO HIGHLIGHT ── */
+  .saco-col          { background: #fff8e1 !important; font-weight: 700; color: #7a5c00; }
+  th.saco-col        { background: #d4920e !important; color: #fff; }
+
+  /* ── STATUS BADGE ── */
+  .badge { display: inline-block; padding: 1px 6px; border-radius: 10px; font-size: 8px; font-weight: 700; }
+  .badge.pendiente   { background: #fff3cd; color: #856404; border: 1px solid #ffc107; }
+
+  /* ── CHECK BOX ── */
+  .check-box { width: 10px; height: 10px; border: 1px solid #4a7c3f; display: inline-block; flex-shrink: 0; }
+
+  /* ── PROTECCIÓN ── */
+  .proteccion-grid   { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding: 3px 0; }
+  .proteccion-items  { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 3px; }
+  .proteccion-item   { display: flex; align-items: center; gap: 4px; font-size: 8.5px; }
+  .obs-area          { border: 1px solid #c5d9bb; height: 30px; background: #f9fdf7; padding: 4px; font-size: 8.5px; color: #aaa; font-style: italic; }
+
+  /* ── FIRMAS ── */
+  .firmas-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; margin-top: 10px; }
+  .firma-box   { text-align: center; }
+  .firma-label { font-weight: 700; color: #2d5a1f; font-size: 9px; margin-bottom: 2px; }
+  .firma-name  { font-size: 8.5px; color: #666; font-style: italic; min-height: 12px; }
+  .firma-line  { border-top: 1px solid #4a7c3f; margin-top: 18px; padding-top: 4px; font-size: 8px; color: #555; }
+
+  /* ── FOOTER ── */
+  .footer { margin-top: 10px; border-top: 1px solid #c5d9bb; padding-top: 4px; display: flex; justify-content: space-between; font-size: 7px; color: #999; }
+
+  @page {
+    size: A4 landscape;
+    margin: 12mm 14mm;
+  }
+
+  @media print {
+    body  { padding: 0; }
+    .page { padding: 12px 16px; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- ══ HEADER ══ -->
+  <div class="header">
+    <div class="logo-box">
+      <svg viewBox="0 0 80 56" width="60" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M28 7 C18 3, 8 13, 14 27 C20 41, 34 37, 34 27 C34 17, 28 7, 28 7Z" fill="#6ba348" opacity="0.9"/>
+        <path d="M38 3 C48 -1, 60 9, 54 23 C48 37, 34 33, 36 23 C38 13, 38 3, 38 3Z" fill="#8dc63f" opacity="0.9"/>
+        <path d="M33 31 L33 50" stroke="#4a7c3f" stroke-width="2.5" stroke-linecap="round"/>
+      </svg>
+      <div class="logo-text-lh">LH</div>
+      <div class="logo-text-fruits">Fruits</div>
+    </div>
+
+    <div class="header-title">
+      <h1>Registro de Aplicación de Fertilizantes</h1>
+      <p>Sociedad Agrícola La Hornilla Ltda. — Documento de Certificación y Auditoría Interna</p>
+    </div>
+
+    <div class="header-meta">
+      <div class="orden-num">{{ numero_orden }}</div>
+      <div><strong>Temporada:</strong> {{ programa.temporada }}</div>
+      <div><strong>Semana:</strong> {{ semana_label }}</div>
+      <div><strong>Período:</strong> {{ periodo }}</div>
+      <div><strong>Fecha emisión:</strong> {{ fecha_emision }}</div>
+    </div>
+  </div>
+
+  <!-- ══ DETALLES GENERALES ══ -->
+  <div class="section-title">Detalles Generales</div>
+  <div class="detalles-grid">
+    <div class="field-row">
+      <span class="field-label">Fundo / Sucursal:</span>
+      <span class="field-value">La Hornilla — {{ programa.sucursal }}</span>
+    </div>
+    <div class="field-row">
+      <span class="field-label">Cuartel:</span>
+      <span class="field-value">{{ programa.cuartel_nombre }}</span>
+    </div>
+    <div class="field-row">
+      <span class="field-label">Variedad:</span>
+      <span class="field-value">{{ programa.variedad or '—' }}</span>
+    </div>
+    <div class="field-row">
+      <span class="field-label">Superficie Productiva:</span>
+      <span class="field-value">{{ sup_fmt }} ha</span>
+    </div>
+    <div class="field-row">
+      <span class="field-label">Estado Fenológico:</span>
+      <span class="field-value">{{ programa.etapa or '—' }}</span>
+    </div>
+    <div class="field-row">
+      <span class="field-label">Portainjerto:</span>
+      <span class="field-value">{{ programa.portainjerto_nombre or '—' }}</span>
+    </div>
+    <div class="field-row">
+      <span class="field-label">Método de Aplicación:</span>
+      <span class="field-value">Fertirrigación</span>
+    </div>
+    <div class="field-row">
+      <span class="field-label">Responsable:</span>
+      <span class="field-value">{{ programa.responsable }}</span>
+    </div>
+    <div class="field-row">
+      <span class="field-label">Objetivo:</span>
+      <span class="field-value">Abono / Nutrición</span>
+    </div>
+  </div>
+
+  <!-- ══ PRODUCTOS A APLICAR ══ -->
+  <div class="section-title">Productos a Aplicar — {{ semana_label }}</div>
+  <table>
+    <thead>
+      <tr>
+        <th style="width:24%">Producto Comercial</th>
+        <th style="width:14%">Análisis<br>N – P – K</th>
+        <th style="width:10%">Dosis/Ha<br>(kg o L)</th>
+        <th style="width:9%">N<br>(UN/ha)</th>
+        <th style="width:9%">K<br>(UN/ha)</th>
+        <th style="width:9%">P<br>(UN/ha)</th>
+        <th style="width:8%">Unidad</th>
+        <th class="saco-col" style="width:11%">Saco/Envase<br>(25 kg c/u)</th>
+        <th style="width:6%">Obs.</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for p in productos %}
+      <tr>
+        <td class="bold">{{ p.nombre_comercial }}</td>
+        <td class="center">{{ p.analisis }}</td>
+        <td class="center">{{ p.dosis_fmt }}</td>
+        <td class="center">{{ p.un_n_fmt }}</td>
+        <td class="center">{{ p.un_k_fmt }}</td>
+        <td class="center">{{ p.un_p_fmt }}</td>
+        <td class="center">{{ p.unidad }}</td>
+        <td class="center saco-col">{{ p.sacos_label }}</td>
+        <td></td>
+      </tr>
+      {% endfor %}
+      <tr>
+        <td class="blank"></td><td class="blank"></td><td class="blank"></td>
+        <td class="blank"></td><td class="blank"></td><td class="blank"></td>
+        <td class="blank"></td><td class="blank saco-col"></td><td class="blank"></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <!-- ══ PLAN POR SECTOR DE RIEGO ══ -->
+  <div class="section-title">Plan de Aplicación — Detalle por Sector de Riego</div>
+  <table>
+    <thead>
+      <tr>
+        <th style="width:9%">Semana</th>
+        <th style="width:18%">Sector de Riego</th>
+        <th style="width:16%">Cuartel</th>
+        <th style="width:9%">Variedad</th>
+        <th style="width:5%">Sup.<br>(ha)</th>
+        <th style="width:14%">Producto</th>
+        <th style="width:7%">Dosis/Ha<br>(kg o L)</th>
+        <th style="width:7%">Total<br>(kg o L)</th>
+        <th class="saco-col" style="width:7%">Sacos /<br>Envases</th>
+        <th style="width:5%">H. Inicio</th>
+        <th style="width:5%">H. Término</th>
+        <th style="width:4%">Estado</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in plan_rows %}
+      <tr class="{{ row.color }}">
+        <td class="center bold">{{ row.semana_label }}</td>
+        <td><span class="sector-badge">S-{{ row.sector_idx }}</span>&nbsp;{{ row.sector_nombre }}</td>
+        <td class="bold">{{ row.cuartel_nombre }}</td>
+        <td class="center">{{ row.variedad }}</td>
+        <td class="center">{{ row.sup_fmt }}</td>
+        <td>{{ row.producto }}</td>
+        <td class="center">{{ row.dosis_fmt }}</td>
+        <td class="center">{{ row.total_fmt }}</td>
+        <td class="center saco-col">{{ row.sacos_label }}</td>
+        <td class="blank-sm center"></td>
+        <td class="blank-sm center"></td>
+        <td class="center"><span class="badge pendiente">Pend.</span></td>
+      </tr>
+      {% endfor %}
+      <tr>
+        <td class="blank center"></td><td class="blank"></td><td class="blank"></td>
+        <td class="blank center"></td><td class="blank center"></td><td class="blank"></td>
+        <td class="blank center"></td><td class="blank center"></td>
+        <td class="blank center saco-col"></td>
+        <td class="blank center"></td><td class="blank center"></td><td class="blank center"></td>
+      </tr>
+      <tr class="totales-row">
+        <td colspan="4" class="center">TOTALES {{ semana_label }}</td>
+        <td class="center">{{ total_ha_sectores }} ha</td>
+        <td></td><td></td>
+        <td class="center">{{ total_kg_sectores }} kg</td>
+        <td class="center saco-col">{{ total_sacos_sectores }} sacos</td>
+        <td colspan="3"></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <!-- ══ CONFIRMACIÓN POR SECTOR ══ -->
+  <div class="section-title">Confirmación de Aplicación por Sector de Riego</div>
+  <table>
+    <thead>
+      <tr>
+        <th style="width:14%">Sector de Riego</th>
+        <th style="width:16%">Cuartel</th>
+        <th style="width:8%">Variedad</th>
+        <th style="width:5%">Sup.<br>(ha)</th>
+        <th style="width:12%">Producto</th>
+        <th style="width:7%">Cant.<br>Plan (kg)</th>
+        <th class="saco-col" style="width:6%">Sacos<br>Plan</th>
+        <th style="width:7%">Cant.<br>Real (kg)</th>
+        <th class="saco-col" style="width:6%">Sacos<br>Real</th>
+        <th style="width:8%">F. Aplicación</th>
+        <th style="width:5%">H. Inicio</th>
+        <th style="width:5%">H. Término</th>
+        <th style="width:4%">Estado</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in plan_rows %}
+      <tr class="{{ row.color }}">
+        <td><span class="sector-badge">S-{{ row.sector_idx }}</span>&nbsp;{{ row.sector_nombre }}</td>
+        <td class="bold">{{ row.cuartel_nombre }}</td>
+        <td class="center">{{ row.variedad }}</td>
+        <td class="center">{{ row.sup_fmt }}</td>
+        <td>{{ row.producto }}</td>
+        <td class="center">{{ row.total_fmt }}</td>
+        <td class="center saco-col">{{ row.sacos_label }}</td>
+        <td class="blank-sm center"></td>
+        <td class="blank-sm center saco-col"></td>
+        <td class="center">{{ row.semana_label }}</td>
+        <td class="blank-sm center"></td>
+        <td class="blank-sm center"></td>
+        <td class="center"><span class="badge pendiente">Pend.</span></td>
+      </tr>
+      {% endfor %}
+      <tr class="totales-row">
+        <td colspan="3" class="center">TOTALES</td>
+        <td class="center">{{ total_ha_sectores }} ha</td>
+        <td></td>
+        <td class="center">{{ total_kg_sectores }}</td>
+        <td class="center saco-col">{{ total_sacos_sectores }}</td>
+        <td class="blank-sm center"></td>
+        <td class="blank-sm center saco-col"></td>
+        <td colspan="4"></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <!-- ══ EPP Y OBSERVACIONES ══ -->
+  <div class="section-title" style="margin-top:14px">Equipo de Protección y Observaciones</div>
+  <div class="proteccion-grid">
+    <div>
+      <div style="font-weight:700;color:#2d5a1f;font-size:9px;margin-bottom:5px">Equipo de Protección Personal (EPP)</div>
+      <div class="proteccion-items">
+        <div class="proteccion-item"><span class="check-box"></span> Guantes</div>
+        <div class="proteccion-item"><span class="check-box"></span> Mascarilla</div>
+        <div class="proteccion-item"><span class="check-box"></span> Antiparras</div>
+        <div class="proteccion-item"><span class="check-box"></span> Traje de goma</div>
+        <div class="proteccion-item"><span class="check-box"></span> Botas</div>
+      </div>
+      <div style="margin-top:8px;font-size:8.5px;color:#555;line-height:1.6">
+        <strong>Precauciones:</strong> Evitar aplicación cerca de cursos de agua.
+        En fertirrigación, aplicar en el último tercio del riego.
+        Dar aviso a vecinos colindantes con al menos 24 hrs. de anticipación.
+      </div>
+    </div>
+    <div>
+      <div style="font-weight:700;color:#2d5a1f;font-size:9px;margin-bottom:5px">Observaciones Generales de Aplicación</div>
+      <div class="obs-area">Escribir observaciones aquí...</div>
+    </div>
+  </div>
+
+  <!-- ══ FIRMAS ══ -->
+  <div class="firmas-grid">
+    <div class="firma-box">
+      <div class="firma-label">Recomienda / Ingeniero</div>
+      <div class="firma-name"></div>
+      <div class="firma-line">________________________________<br>FIRMA Y TIMBRE</div>
+    </div>
+    <div class="firma-box">
+      <div class="firma-label">Dosificador</div>
+      <div class="firma-name"></div>
+      <div class="firma-line">________________________________<br>FIRMA Y TIMBRE</div>
+    </div>
+    <div class="firma-box">
+      <div class="firma-label">Aplicador / Responsable</div>
+      <div class="firma-name">{{ programa.responsable }}</div>
+      <div class="firma-line">________________________________<br>FIRMA Y TIMBRE</div>
+    </div>
+  </div>
+
+  <!-- ══ FOOTER ══ -->
+  <div class="footer">
+    <span>Sociedad Agrícola La Hornilla Ltda. — Documento de uso interno para certificación y auditoría agronómica</span>
+    <span>{{ numero_orden }} | Generado: {{ fecha_emision }} | Temporada {{ programa.temporada }}</span>
+  </div>
+
+</div>
+</body>
+</html>

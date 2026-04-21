@@ -1,0 +1,14 @@
+<div class="add-producto-form">
+  <form method="post" action="/app/matriz/{{ id_cuartel }}/agregar-producto">
+    {% if temporada %}<input type="hidden" name="temporada" value="{{ temporada }}">{% endif %}
+    <select class="filter-select" name="id_producto" required style="min-width:240px;">
+      <option value="">— Seleccionar producto —</option>
+      {% for p in productos %}
+      <option value="{{ p.id }}">{{ p.nombre_comercial }}</option>
+      {% endfor %}
+    </select>
+    <button type="submit" class="filter-btn">Agregar</button>
+    <button type="button" class="filter-btn filter-btn-ghost"
+            onclick="document.getElementById('add-prod-panel').innerHTML=''">Cancelar</button>
+  </form>
+</div>

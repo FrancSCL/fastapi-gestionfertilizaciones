@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Registro Fertilización Riego por Goteo – La Hornilla</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: Arial, sans-serif; font-size: 8.5px; color: #2c2c2c; background: #fff; padding: 14px 18px; }
+
+/* HEADER */
+.header { display: grid; grid-template-columns: 100px 1fr 190px; align-items: center; border-bottom: 3px solid #4a7c3f; padding-bottom: 8px; margin-bottom: 12px; gap: 10px; }
+.logo-box { display: flex; flex-direction: column; align-items: center; }
+.logo-lh  { font-size: 20px; font-weight: 800; color: #3a3a3a; letter-spacing: 2px; }
+.logo-sub { font-size: 7px; font-weight: 700; color: #6ba348; letter-spacing: 4px; text-transform: uppercase; }
+.header-title { text-align: center; }
+.header-title h1 { font-size: 12px; font-weight: 800; color: #2d5a1f; text-transform: uppercase; }
+.header-title p  { font-size: 8px; color: #666; margin-top: 2px; font-style: italic; }
+.header-meta { font-size: 8.5px; line-height: 1.9; color: #444; background: #f4faf1; border: 1px solid #c5d9bb; border-radius: 4px; padding: 6px 9px; }
+.header-meta .sem { font-size: 13px; font-weight: 800; color: #2d5a1f; margin-bottom: 1px; }
+
+/* VARIEDAD HEADER */
+.var-header { background: #2d5a1f; color: #fff; font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.8px; padding: 4px 10px; margin: 14px 0 0; }
+
+/* TABLE */
+table { width: 100%; border-collapse: collapse; font-size: 8px; }
+
+th {
+  background: #4a7c3f; color: #fff;
+  padding: 4px 4px; text-align: center; font-weight: 700;
+  text-transform: uppercase; font-size: 7px;
+  border: 1px solid #3a6532; line-height: 1.3;
+}
+th.prod-name { background: #3a6532; font-size: 7.5px; font-weight: 800; letter-spacing: 0.4px; }
+th.saco      { background: #e6a817; color: #fff; }
+
+td { padding: 4px 4px; border: 1px solid #c5d9bb; vertical-align: middle; line-height: 1.3; }
+tr:nth-child(even) td { background: #f4faf1; }
+tr:nth-child(odd)  td { background: #fff; }
+td.center { text-align: center; }
+td.bold   { font-weight: 700; }
+td.cuartel-td { font-weight: 700; color: #2d5a1f; vertical-align: middle; background: #edf7e8 !important; }
+td.saco-td    { background: #fffbe6 !important; font-weight: 700; color: #7a5c00; text-align: center; }
+td.blank      { background: #fff !important; }
+
+/* FOOTER */
+.footer { margin-top: 12px; border-top: 1px solid #c5d9bb; padding-top: 5px; display: flex; justify-content: space-between; font-size: 7px; color: #999; }
+
+@page { size: A4 landscape; margin: 9mm; }
+@media print { body { padding: 0; } }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="logo-box">
+    <svg viewBox="0 0 80 56" width="50" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M28 7 C18 3,8 13,14 27 C20 41,34 37,34 27 C34 17,28 7,28 7Z" fill="#6ba348" opacity="0.9"/>
+      <path d="M38 3 C48 -1,60 9,54 23 C48 37,34 33,36 23 C38 13,38 3,38 3Z" fill="#8dc63f" opacity="0.9"/>
+      <path d="M33 31 L33 50" stroke="#4a7c3f" stroke-width="2.5" stroke-linecap="round"/>
+    </svg>
+    <div class="logo-lh">LH</div>
+    <div class="logo-sub">Fruits</div>
+  </div>
+  <div class="header-title">
+    <h1>Registro de Fertilización Riego por Goteo</h1>
+    <p>Sociedad Agrícola La Hornilla Ltda. &nbsp;·&nbsp; Temporada 2025-2026 &nbsp;·&nbsp; Detalle por sector de riego</p>
+  </div>
+  <div class="header-meta">
+    <div class="sem">{{ etiqueta_semana }}</div>
+    <div><strong>Período:</strong> {{ periodo }}</div>
+    <div><strong>Emisión:</strong> {{ fecha_emision }}</div>
+  </div>
+</div>
+
+{% for sec in secciones %}
+<div class="var-header">{{ sec.variedad }}</div>
+<table>
+  <thead>
+    <tr>
+      <th rowspan="2" style="width:12%">Cuartel</th>
+      <th rowspan="2" style="width:7%">Estado<br>Fenológico</th>
+      <th rowspan="2" style="width:7%">Sector<br>de Riego</th>
+      <th rowspan="2" style="width:4%">Sup.<br>(ha)</th>
+      {% for prod in sec.productos %}
+      <th colspan="2" class="prod-name">{{ prod }}</th>
+      {% endfor %}
+      <th rowspan="2" style="width:5%">H.<br>Inicio</th>
+      <th rowspan="2" style="width:5%">H.<br>Término</th>
+      <th rowspan="2" style="width:3%">✓</th>
+    </tr>
+    <tr>
+      {% for prod in sec.productos %}
+      <th style="width:6%">Total<br>(kg/L)</th>
+      <th class="saco" style="width:4%">Sacos/<br>Env.</th>
+      {% endfor %}
+    </tr>
+  </thead>
+  <tbody>
+    {% for row in sec.rows %}
+    {% if row.type == 'sector' %}
+    <tr>
+      {% if row.is_first %}
+      <td class="cuartel-td" rowspan="{{ row.rowspan }}">{{ row.cuartel }}</td>
+      <td class="center" rowspan="{{ row.rowspan }}" style="font-size:7px;color:#555">{{ row.etapa }}</td>
+      {% endif %}
+      <td class="center">{{ row.sector }}</td>
+      <td class="center bold">{{ row.sup_fmt }}</td>
+      {% for prod in sec.productos %}
+        {% if row.cantidades[prod] %}
+        <td class="center">{{ row.cantidades[prod].total_fmt }}</td>
+        <td class="saco-td">{{ row.cantidades[prod].sacos }}</td>
+        {% else %}
+        <td class="center blank">—</td>
+        <td class="saco-td blank"></td>
+        {% endif %}
+      {% endfor %}
+      <td class="blank"></td>
+      <td class="blank"></td>
+      <td class="blank center"></td>
+    </tr>
+    {% endif %}
+    {% endfor %}
+  </tbody>
+</table>
+{% endfor %}
+
+<div class="footer">
+  <span>Sociedad Agrícola La Hornilla Ltda. — Registro de Fertilización Riego por Goteo — Temporada 2025-2026</span>
+  <span>Semana {{ etiqueta_semana }} | Generado: {{ fecha_emision }}</span>
+</div>
+
+</body>
+</html>

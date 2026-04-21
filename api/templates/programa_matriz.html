@@ -1,0 +1,337 @@
+{% extends "base.html" %}
+
+{% block title %}Matriz de Fertilización{% endblock %}
+
+{% block topbar_title %}Programa de Fertilización{% endblock %}
+
+{% block topbar_extra %}
+<div class="topbar-actions">
+  <select class="filter-select" id="cuartelSelect" onchange="irACuartel(this.value)" style="min-width: 280px;">
+    <option value="">Seleccionar cuartel...</option>
+    {% for c in cuarteles %}
+    <option value="{{ c.id }}">{{ c.nombre }}</option>
+    {% endfor %}
+  </select>
+</div>
+{% endblock %}
+
+{% block content %}
+{% if not cuartel %}
+<div class="empty-card">
+  <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+    <rect x="3" y="3" width="18" height="18" rx="2"/>
+    <line x1="3" y1="9" x2="21" y2="9"/>
+    <line x1="9" y1="3" x2="9" y2="21"/>
+  </svg>
+  <h3>Seleccione un cuartel</h3>
+  <p>Elija un cuartel del menú superior para ver o editar su programa de fertilización.</p>
+</div>
+{% else %}
+<div class="matriz-header">
+  <div class="matriz-info">
+    <h1>{{ cuartel.nombre }}</h1>
+    <div class="matriz-meta">
+      <span class="tag">{{ cuartel.especie_nombre|default('—') }}</span>
+      <span class="tag">{{ cuartel.portainjerto_nombre|default('—') }}</span>
+      <span class="tag">{{ cuartel.ano_plantacion|default('—') }}</span>
+      <span class="sup-value">{{ cuartel.sup_productiva|default(0) }} <span class="sup-unit">ha</span></span>
+    </div>
+  </div>
+
+  <div class="matriz-panels">
+    <div class="panel panel-factores">
+      <h4>Factores Agronómicos</h4>
+      <div class="factor-grid">
+        <div class="factor-item">
+          <span class="factor-label">Vigor</span>
+          <span class="factor-value">{{ factores.id_vigor|default('Medio') }}</span>
+        </div>
+        <div class="factor-item">
+          <span class="factor-label">N</span>
+          <span class="factor-value">{{ factores.factor_n|default(4.0) }}</span>
+        </div>
+        <div class="factor-item">
+          <span class="factor-label">K</span>
+          <span class="factor-value">{{ factores.factor_k|default(6.0) }}</span>
+        </div>
+        <div class="factor-item">
+          <span class="factor-label">P</span>
+          <span class="factor-value">{{ factores.factor_p|default(1.5) }}</span>
+        </div>
+        <div class="factor-item">
+          <span class="factor-label">Mg</span>
+          <span class="factor-value">{{ factores.factor_mg|default(1.0) }}</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel panel-historial">
+      <h4>Historial Producción</h4>
+      <div class="historial-value">{{ historial.promedio|default(0) }} ton/ha</div>
+    </div>
+  </div>
+</div>
+
+<div class="matriz-table-wrap">
+  <table class="matriz-table" id="matrizTable">
+    <thead>
+      <tr>
+        <th class="sticky-col">Semana</th>
+        {% for p in productos %}
+        <th class="producto-col" title="{{ p.nombre_comercial }}">{{ p.nombre_comercial|truncate(12) }}</th>
+        {% endfor %}
+        <th class="total-col">TOTAL kg/ha</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for sem in semanas %}
+      <tr data-semana="{{ sem.id }}">
+        <td class="sticky-col">
+          <div class="semana-label">{{ sem.etiqueta_semana }}</div>
+          <div class="semana-dates">{{ sem.fecha_inicio.strftime('%d/%m') }} - {{ sem.fecha_fin.strftime('%d/%m') }}</div>
+        </td>
+        {% for p in productos %}
+        <td class="dosis-cell">
+          <input type="number" 
+                 class="dosis-input" 
+                 data-cuartel="{{ cuartel.id }}"
+                 data-semana="{{ sem.id }}" 
+                 data-producto="{{ p.id }}"
+                 value="{{ dosis.get((sem.id, p.id), '') }}"
+                 placeholder="—"
+                 min="0"
+                 step="any"
+                 onchange="guardarDosis(this)">
+        </td>
+        {% endfor %}
+        <td class="total-cell" data-semana="{{ sem.id }}">0</td>
+      </tr>
+      {% endfor %}
+      <tr class="totales-row">
+        <td class="sticky-col">TOTAL kg/ha</td>
+        {% for p in productos %}
+        <td class="total-producto" data-producto="{{ p.id }}">0</td>
+        {% endfor %}
+        <td class="total-gran-total">0</td>
+      </tr>
+      <tr class="bloques-row">
+        <td class="sticky-col">TOTAL BLOQUES</td>
+        {% for p in productos %}
+        <td class="bloque-cell" data-producto="{{ p.id }}">0</td>
+        {% endfor %}
+        <td class="total-gran-total">0</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+{% endif %}
+
+<style>
+.empty-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 80px 40px;
+  text-align: center;
+  color: var(--text-secondary);
+}
+.empty-card svg { margin-bottom: 20px; color: var(--lh-300); }
+.empty-card h3 { margin-bottom: 8px; color: var(--lh-800); }
+.empty-card p { max-width: 40ch; }
+
+/* Matriz header */
+.matriz-header {
+  display: flex;
+  gap: 24px;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+}
+
+.matriz-info { flex: 1; min-width: 300px; }
+.matriz-info h1 { margin-bottom: 8px; font-size: 1.5rem; }
+
+.matriz-meta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.matriz-panels {
+  display: flex;
+  gap: 16px;
+}
+
+.panel {
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 16px;
+  min-width: 180px;
+}
+.panel h4 {
+  font-size: 0.6875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--lh-700);
+  margin-bottom: 12px;
+}
+
+.factor-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+}
+.factor-item {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.8125rem;
+}
+.factor-label { color: var(--text-secondary); }
+.factor-value { font-weight: 600; color: var(--lh-800); }
+
+.historial-value {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--lh-700);
+}
+
+/* Matriz table */
+.matriz-table-wrap {
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.matriz-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8125rem;
+}
+
+.matriz-table th,
+.matriz-table td {
+  padding: 10px 12px;
+  text-align: center;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.matriz-table th {
+  background: var(--lh-50);
+  font-weight: 600;
+  font-size: 0.6875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--lh-700);
+  white-space: nowrap;
+}
+
+.matriz-table .sticky-col {
+  position: sticky;
+  left: 0;
+  background: var(--lh-50);
+  z-index: 2;
+  text-align: left;
+  min-width: 140px;
+  border-right: 2px solid var(--lh-200);
+}
+
+.producto-col { min-width: 80px; }
+.total-col { min-width: 90px; background: var(--lh-100); }
+
+.semana-label { font-weight: 600; color: var(--lh-800); }
+.semana-dates { font-size: 0.6875rem; color: var(--text-muted); }
+
+.dosis-input {
+  width: 60px;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  text-align: center;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  transition: all 0.15s;
+}
+.dosis-input:focus {
+  outline: none;
+  border-color: var(--lh-500);
+  box-shadow: 0 0 0 3px oklch(0.52 0.12 145 / 0.12);
+  background: var(--surface-raised);
+}
+.dosis-input::placeholder { color: var(--n-300); }
+
+.total-cell,
+.total-producto,
+.bloque-cell {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  background: var(--lh-50);
+}
+
+.total-gran-total {
+  font-weight: 700;
+  background: var(--lh-100);
+  color: var(--lh-800);
+}
+
+.totales-row td,
+.bloques-row td {
+  border-top: 2px solid var(--lh-200);
+}
+
+@media (max-width: 768px) {
+  .matriz-header { flex-direction: column; }
+  .matriz-panels { width: 100%; }
+  .panel { flex: 1; }
+}
+</style>
+
+<script>
+// Cargar cuarteles al inicio
+document.addEventListener('DOMContentLoaded', function() {
+  // Por ahora nada especial
+});
+
+function irACuartel(id) {
+  if (id) {
+    window.location.href = '/app/matriz/' + id;
+  }
+}
+
+async function guardarDosis(input) {
+  const id_cuartel = input.dataset.cuartel;
+  const id_semana = input.dataset.semana;
+  const id_producto = input.dataset.producto;
+  const dosis = input.value;
+  
+  try {
+    const formData = new URLSearchParams();
+    formData.append('id_cuartel', id_cuartel);
+    formData.append('id_semana', id_semana);
+    formData.append('id_producto', id_producto);
+    formData.append('dosis', dosis);
+    
+    const resp = await fetch('/app/matriz/save', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: formData
+    });
+    
+    if (!resp.ok) throw new Error('Error guardando');
+    
+    // Feedback visual
+    input.style.backgroundColor = 'oklch(0.72 0.08 145 / 0.2)';
+    setTimeout(() => {
+      input.style.backgroundColor = '';
+    }, 500);
+    
+  } catch (e) {
+    alert('Error al guardar: ' + e.message);
+    input.value = input.defaultValue;
+  }
+}
+</script>
+{% endblock %}

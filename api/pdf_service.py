@@ -1,0 +1,260 @@
+import math
+from datetime import date
+from pathlib import Path
+
+from jinja2 import Environment, FileSystemLoader, select_autoescape
+from weasyprint import HTML
+
+TEMPLATES_DIR = Path(__file__).parent / "templates"
+PESO_ENVASE_KG = 25.0
+SECTOR_COLORS = ["sector-a", "sector-b", "sector-c", "sector-d"]
+
+_env = Environment(
+    loader=FileSystemLoader(str(TEMPLATES_DIR)),
+    autoescape=select_autoescape(["html"]),
+)
+
+
+def _fmt(val, decimals=1) -> str:
+    if val is None:
+        return "0"
+    return f"{float(val):,.{decimals}f}"
+
+
+def _sacos_label(total: float) -> str:
+    n = math.ceil(total / PESO_ENVASE_KG)
+    return f"{n} sacos"
+
+
+def build_pdf(programa: dict, productos: list, sectores: list) -> bytes:
+    sup = float(programa.get("sup_productiva") or 0)
+
+    # ── Enriquecer productos ──────────────────────────────────────────────────
+    enriched_productos = []
+    for p in productos:
+        p = dict(p)
+        dosis = float(p.get("dosis_ha") or 0)
+        total = dosis * sup
+
+        p["dosis_fmt"]  = _fmt(dosis, 0)
+        p["total_fmt"]  = _fmt(total, 0)
+        p["total_raw"]  = total
+        p["sacos_label"] = _sacos_label(total)
+        p["un_n_fmt"]   = _fmt(p.get("unidades_n"), 2)
+        p["un_k_fmt"]   = _fmt(p.get("unidades_k"), 2)
+        p["un_p_fmt"]   = _fmt(p.get("unidades_p"), 2)
+
+        pct_n = round(float(p.get("pct_n") or 0) * 100)
+        pct_p = round(float(p.get("pct_p") or 0) * 100)
+        pct_k = round(float(p.get("pct_k") or 0) * 100)
+        p["analisis"] = f"{pct_n} – {pct_p} – {pct_k}"
+
+        enriched_productos.append(p)
+
+    # ── Totales globales ──────────────────────────────────────────────────────
+    total_kg_global  = sum(p["total_raw"] for p in enriched_productos)
+    total_sacos_global = math.ceil(total_kg_global / PESO_ENVASE_KG)
+
+    # ── Plan por sector × producto ────────────────────────────────────────────
+    plan_rows = []
+    for i, sector in enumerate(sectores):
+        color = SECTOR_COLORS[i % len(SECTOR_COLORS)]
+        sec_sup = float(sector.get("superficie") or 0)
+        for p in enriched_productos:
+            dosis = float(p.get("dosis_ha") or 0)
+            sec_total = dosis * sec_sup
+            plan_rows.append({
+                "semana_label":   programa.get("etiqueta_semana") or str(programa.get("semana_calendario", "")),
+                "sector_nombre":  sector["sector_nombre"],
+                "sector_idx":     i + 1,
+                "cuartel_nombre": programa["cuartel_nombre"],
+                "variedad":       programa.get("variedad") or "",
+                "sup_fmt":        _fmt(sec_sup, 2),
+                "producto":       p["nombre_comercial"],
+                "dosis_fmt":      _fmt(dosis, 0),
+                "total_fmt":      _fmt(sec_total, 0),
+                "sacos_label":    _sacos_label(sec_total),
+                "color":          color,
+            })
+
+    # ── Totales por sector ────────────────────────────────────────────────────
+    total_ha_sectores = sum(float(s.get("superficie") or 0) for s in sectores)
+    total_kg_sectores = sum(
+        float(p.get("dosis_ha") or 0) * float(s.get("superficie") or 0)
+        for s in sectores
+        for p in enriched_productos
+    )
+    total_sacos_sectores = math.ceil(total_kg_sectores / PESO_ENVASE_KG)
+
+    # ── Número de orden y período ─────────────────────────────────────────────
+    semana_label = programa.get("etiqueta_semana") or str(programa.get("semana_calendario", ""))
+    numero_orden = f"N° {semana_label}-{programa['id'][:6].upper()}"
+
+    fi = programa.get("sem_fecha_inicio")
+    ft = programa.get("sem_fecha_fin")
+    periodo = ""
+    if fi and ft:
+        periodo = f"{fi.strftime('%d/%m/%Y')} → {ft.strftime('%d/%m/%Y')}"
+    elif fi:
+        periodo = fi.strftime("%d/%m/%Y")
+
+    # ── Render ────────────────────────────────────────────────────────────────
+    template = _env.get_template("papeleta.html")
+    html_str = template.render(
+        programa=programa,
+        productos=enriched_productos,
+        sectores=sectores,
+        plan_rows=plan_rows,
+        numero_orden=numero_orden,
+        semana_label=semana_label,
+        periodo=periodo,
+        fecha_emision=date.today().strftime("%d/%m/%Y"),
+        sup_fmt=_fmt(sup, 2),
+        total_kg_fmt=_fmt(total_kg_global, 0),
+        total_sacos=total_sacos_global,
+        total_ha_sectores=_fmt(total_ha_sectores, 2),
+        total_kg_sectores=_fmt(total_kg_sectores, 0),
+        total_sacos_sectores=total_sacos_sectores,
+    )
+
+    return HTML(string=html_str, base_url=str(TEMPLATES_DIR)).write_pdf()
+
+
+def _bodega_secciones(programas: list, productos_map: dict, sectores_map: dict, pro: bool) -> tuple[list, dict]:
+    """
+    Arma la estructura de secciones para las papeletas de bodega.
+    Retorna (secciones, resumen_global).
+    """
+    from collections import defaultdict
+
+    grupos: dict[str, list] = defaultdict(list)
+    for prog in programas:
+        grupos[prog["variedad"]].append(prog)
+
+    resumen_global: dict[str, dict] = {}   # { prod_name: {total, sacos} }
+    secciones = []
+
+    for variedad, progs in grupos.items():
+
+        # Productos únicos de esta variedad (orden de aparición)
+        prod_set: list[str] = []
+        seen: set[str] = set()
+        for prog in progs:
+            for p in productos_map.get(prog["id"], []):
+                nm = p["nombre_comercial"]
+                if nm not in seen:
+                    prod_set.append(nm)
+                    seen.add(nm)
+                if nm not in resumen_global:
+                    resumen_global[nm] = {"total": 0.0, "sacos": 0}
+
+        rows = []
+        total_var: dict[str, float] = {p: 0.0 for p in prod_set}
+
+        for prog in progs:
+            id_cuartel  = prog["id_cuartel"]
+            sup_total   = float(prog.get("sup_productiva") or 0)
+            sectores    = sectores_map.get(id_cuartel, [])
+            prods_prog  = {
+                p["nombre_comercial"]: float(p["dosis_ha"] or 0)
+                for p in productos_map.get(prog["id"], [])
+            }
+
+            if not sectores:
+                sectores = [{"sector_nombre": "—", "superficie": sup_total}]
+
+            n_sec = len(sectores)
+            sub_cuartel: dict[str, float] = {p: 0.0 for p in prod_set}
+
+            for i, sec in enumerate(sectores):
+                sec_sup = float(sec.get("superficie") or 0)
+                cantidades = {}
+                for prod_name in prod_set:
+                    dosis = prods_prog.get(prod_name, 0.0)
+                    total = dosis * sec_sup
+                    cantidades[prod_name] = {
+                        "total_fmt": _fmt(total, 1),
+                        "sacos":     math.ceil(total / PESO_ENVASE_KG) if total > 0 else 0,
+                    } if dosis > 0 else None
+                    sub_cuartel[prod_name] += total
+
+                rows.append({
+                    "type":      "sector",
+                    "cuartel":   prog["cuartel_nombre"],
+                    "etapa":     prog.get("etapa") or "—",
+                    "rowspan":   n_sec if i == 0 else 0,
+                    "is_first":  i == 0,
+                    "sector":    sec["sector_nombre"],
+                    "sup_fmt":   _fmt(sec_sup, 2),
+                    "cantidades": cantidades,
+                })
+
+            # acumular en variedad y global
+            for prod_name, val in sub_cuartel.items():
+                total_var[prod_name] += val
+                resumen_global[prod_name]["total"] += val
+                resumen_global[prod_name]["sacos"] += math.ceil(val / PESO_ENVASE_KG) if val > 0 else 0
+
+            # fila subtotal por cuartel (solo versión pro)
+            if pro and n_sec > 1:
+                rows.append({
+                    "type":    "subtotal_cuartel",
+                    "cuartel": prog["cuartel_nombre"],
+                    "cantidades": {
+                        p: {
+                            "total_fmt": _fmt(sub_cuartel[p], 1),
+                            "sacos":     math.ceil(sub_cuartel[p] / PESO_ENVASE_KG) if sub_cuartel[p] > 0 else 0,
+                        } if sub_cuartel[p] > 0 else None
+                        for p in prod_set
+                    },
+                })
+
+        # fila total variedad (solo pro)
+        total_var_row = None
+        if pro:
+            total_var_row = {
+                p: {
+                    "total_fmt": _fmt(total_var[p], 1),
+                    "sacos":     math.ceil(total_var[p] / PESO_ENVASE_KG) if total_var[p] > 0 else 0,
+                } if total_var[p] > 0 else None
+                for p in prod_set
+            }
+
+        secciones.append({
+            "variedad":      variedad,
+            "productos":     prod_set,
+            "rows":          rows,
+            "total_var_row": total_var_row,
+        })
+
+    return secciones, resumen_global
+
+
+def build_pdf_bodega(etiqueta_semana: str, programas: list, productos_map: dict, sectores_map: dict, pro: bool = False) -> bytes:
+    """
+    Registro semanal para bodega.
+    pro=False → versión estándar (una fila por sector, rowspan por cuartel)
+    pro=True  → versión extendida (+ subtotales por cuartel, total variedad, resumen global)
+    """
+    secciones, resumen_global = _bodega_secciones(programas, productos_map, sectores_map, pro)
+
+    meta    = programas[0] if programas else {}
+    fi      = meta.get("sem_fecha_inicio")
+    ft      = meta.get("sem_fecha_fin")
+    periodo = ""
+    if fi and ft:
+        periodo = f"{fi.strftime('%d/%m/%Y')} → {ft.strftime('%d/%m/%Y')}"
+    elif fi:
+        periodo = fi.strftime("%d/%m/%Y")
+
+    from datetime import date
+    tmpl_name = "papeleta_bodega_pro.html" if pro else "papeleta_bodega.html"
+    template  = _env.get_template(tmpl_name)
+    html_str  = template.render(
+        etiqueta_semana=etiqueta_semana,
+        periodo=periodo,
+        fecha_emision=date.today().strftime("%d/%m/%Y"),
+        secciones=secciones,
+        resumen_global=resumen_global,
+    )
+    return HTML(string=html_str, base_url=str(TEMPLATES_DIR)).write_pdf()

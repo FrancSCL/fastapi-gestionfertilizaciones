@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+
+{% block title %}Unidades Requeridas — {{ cuartel.nombre }}{% endblock %}
+{% block topbar_title %}Unidades Requeridas{% endblock %}
+
+{% block topbar_extra %}
+<a href="/app/programas" class="filter-btn filter-btn-ghost" style="text-decoration:none; margin-left:auto;">Volver</a>
+{% endblock %}
+
+{% block content %}
+<div class="cuartel-header">
+  <div class="cuartel-meta">
+    <span class="tag tag-sucursal">{{ cuartel.sucursal }}</span>
+    <strong style="color:var(--lh-900)">{{ cuartel.nombre }}</strong>
+    {% if cuartel.variedad %}<span class="tag">{{ cuartel.variedad }}</span>{% endif %}
+    <span class="cuartel-sup">
+      <span class="sup-value">{{ '%.2f' | format(cuartel.sup_productiva | float) }}</span><span class="sup-unit">ha</span>
+    </span>
+  </div>
+</div>
+
+<div class="ur-layout">
+  <!-- Formulario -->
+  <div class="data-table-wrap ur-form-card">
+    <div class="data-table-header">
+      <h2>Calcular Unidades Requeridas</h2>
+    </div>
+    <form method="post" action="/app/unidades/{{ cuartel.id }}"
+          id="ur-form" class="ur-form"
+          hx-get="/app/unidades/{{ cuartel.id }}/preview"
+          hx-trigger="change from:#id_estimacion, change from:#id_vigor"
+          hx-target="#preview-panel"
+          hx-include="#ur-form">
+
+      <div class="ur-form-body">
+        <div class="form-group">
+          <label class="filter-label" for="id_temporada">Temporada</label>
+          <select class="filter-select" id="id_temporada" name="id_temporada" required>
+            {% for t in temporadas %}
+            <option value="{{ t.id }}" {% if filtro_temporada == t.id %}selected{% endif %}>{{ t.temporada }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label class="filter-label" for="id_estimacion">Estimación de cosecha</label>
+          {% if estimaciones %}
+          <select class="filter-select" id="id_estimacion" name="id_estimacion" required>
+            <option value="">— Seleccionar —</option>
+            {% for e in estimaciones %}
+            <option value="{{ e.id_estimacion }}">
+              {{ e.ton_estimadas }} ton · {{ e.especie }} · {{ e.hora_registro.strftime('%d/%m/%Y') if e.hora_registro else '' }}
+            </option>
+            {% endfor %}
+          </select>
+          {% else %}
+          <p class="form-hint form-hint-warn">No hay estimaciones registradas para este cuartel.</p>
+          {% endif %}
+        </div>
+
+        <div class="form-group">
+          <label class="filter-label" for="id_vigor">Vigor</label>
+          <select class="filter-select" id="id_vigor" name="id_vigor" required>
+            <option value="">— Seleccionar —</option>
+            {% for v in vigores %}
+            <option value="{{ v.id }}">{{ v.vigor }} (× {{ v.factor }})</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+
+      <div id="preview-panel" class="ur-preview-panel">
+        <p class="form-hint">Selecciona estimación y vigor para ver el cálculo.</p>
+      </div>
+
+      <div class="ur-form-footer">
+        <button type="submit" class="filter-btn" {% if not estimaciones %}disabled{% endif %}>
+          Guardar Unidades Requeridas
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

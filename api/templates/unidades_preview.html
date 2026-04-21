@@ -1,0 +1,14 @@
+<div class="ur-preview">
+  <div class="ur-preview-header">
+    <span class="ur-preview-label">Preview — {{ estimacion.ton_estimadas }} ton × Vigor {{ vigor.vigor }} ({{ vigor.factor }})</span>
+  </div>
+  <div class="ur-nutrientes">
+    {% for fert, val in unidades.items() %}
+    <div class="ur-nutriente">
+      <span class="ur-nutriente-label">{{ fert }}</span>
+      <span class="ur-nutriente-val">{{ val }}</span>
+      <span class="ur-nutriente-unit">un/ha</span>
+    </div>
+    {% endfor %}
+  </div>
+</div>
