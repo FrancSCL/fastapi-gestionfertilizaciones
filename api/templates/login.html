@@ -13,7 +13,7 @@
 </head>
 <body class="login-body">
   <main class="login-shell">
-    <section class="login-card">
+    <section class="login-card {% if error %}login-card-shake{% endif %}">
       <div class="login-brand">
         <div class="login-brand-icon">
           <img src="/static/logolh.png" alt="La Hornilla">
@@ -31,7 +31,7 @@
       <div class="login-error">{{ error }}</div>
       {% endif %}
 
-      <form class="login-form" method="post" action="/login">
+      <form class="login-form" method="post" action="/login" id="loginForm">
         <input type="hidden" name="next" value="{{ next }}">
 
         <label class="login-field">
@@ -47,9 +47,27 @@
                  autocomplete="current-password" required>
         </label>
 
-        <button type="submit" class="login-btn">Entrar</button>
+        <button type="submit" class="login-btn" id="loginBtn">
+          <span class="login-btn-label">Entrar</span>
+          <span class="login-btn-spinner" aria-hidden="true"></span>
+        </button>
       </form>
     </section>
   </main>
+
+  <script>
+    (function() {
+      const form = document.getElementById('loginForm');
+      const btn = document.getElementById('loginBtn');
+      if (!form || !btn) return;
+
+      form.addEventListener('submit', function() {
+        // solo entrar en loading si el form es valido
+        if (!form.checkValidity()) return;
+        btn.classList.add('is-loading');
+        btn.disabled = true;
+      });
+    })();
+  </script>
 </body>
 </html>
