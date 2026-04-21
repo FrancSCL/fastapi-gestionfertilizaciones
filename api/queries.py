@@ -743,3 +743,18 @@ def get_sectores_multiples(ids_cuartel: list) -> list:
         with conn.cursor() as cur:
             cur.execute(sql, ids_cuartel)
             return cur.fetchall()
+
+
+# ══ AUTH ═══════════════════════════════════════════════════════════════════════
+
+def validar_login(usuario: str, contrasena: str) -> dict | None:
+    sql = """
+        SELECT id, usuario, nombre, apellido
+        FROM z_usuarios_test
+        WHERE usuario = %s AND `contraseña` = %s
+        LIMIT 1
+    """
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(sql, (usuario, contrasena))
+            return cur.fetchone()

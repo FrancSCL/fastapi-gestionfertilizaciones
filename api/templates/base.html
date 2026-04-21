@@ -107,10 +107,10 @@
       </nav>
 
       <div class="sidebar-footer">
-        <div class="sidebar-avatar">{{ user_initials | default('FS') }}</div>
+        <div class="sidebar-avatar">{{ request.session.get('user_initials', 'FS') }}</div>
         <div class="sidebar-user-info">
-          <div class="sidebar-user-name">{{ user_name | default('Francisco Soto') }}</div>
-          <div class="sidebar-user-role">{{ user_role | default('Analista de Sistemas') }}</div>
+          <div class="sidebar-user-name">{{ request.session.get('user_name', 'Invitado') }}</div>
+          <a href="/logout" class="sidebar-logout">Cerrar sesión</a>
         </div>
       </div>
     </aside>

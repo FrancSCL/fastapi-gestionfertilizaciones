@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Iniciar sesión — La Hornilla</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Anybody:wght@600;700;800&family=Archivo:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body class="login-body">
+  <main class="login-shell">
+    <section class="login-card">
+      <div class="login-brand">
+        <div class="login-brand-icon">
+          <svg viewBox="0 0 80 56" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M28 7 C18 3, 8 13, 14 27 C20 41, 34 37, 34 27 C34 17, 28 7, 28 7Z" fill="oklch(0.72 0.12 145)" opacity="0.9"/>
+            <path d="M38 3 C48 -1, 60 9, 54 23 C48 37, 34 33, 36 23 C38 13, 38 3, 38 3Z" fill="oklch(0.64 0.14 145)" opacity="0.9"/>
+            <path d="M33 31 L33 50" stroke="oklch(0.58 0.10 145)" stroke-width="2.5" stroke-linecap="round"/>
+          </svg>
+        </div>
+        <div class="login-brand-text">
+          <span class="login-brand-name">La Hornilla</span>
+          <span class="login-brand-sub">Fertilizaciones</span>
+        </div>
+      </div>
+
+      <h1 class="login-title">Iniciar sesión</h1>
+      <p class="login-sub">Ingresa tus credenciales para continuar.</p>
+
+      {% if error %}
+      <div class="login-error">{{ error }}</div>
+      {% endif %}
+
+      <form class="login-form" method="post" action="/login">
+        <input type="hidden" name="next" value="{{ next }}">
+
+        <label class="login-field">
+          <span class="login-label">Usuario</span>
+          <input class="login-input" type="text" name="usuario"
+                 value="{{ usuario | default('') }}" autocomplete="username"
+                 autofocus required>
+        </label>
+
+        <label class="login-field">
+          <span class="login-label">Contraseña</span>
+          <input class="login-input" type="password" name="contrasena"
+                 autocomplete="current-password" required>
+        </label>
+
+        <button type="submit" class="login-btn">Entrar</button>
+      </form>
+    </section>
+  </main>
+</body>
+</html>

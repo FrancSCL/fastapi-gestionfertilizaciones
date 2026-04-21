@@ -1,9 +1,12 @@
+import os
 from pathlib import Path
 
 from fastapi import FastAPI, Form, HTTPException, Request
 from fastapi.responses import Response, HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.middleware.sessions import SessionMiddleware
 
 from .queries import (
     get_programa, get_productos, get_sectores,
@@ -17,6 +20,7 @@ from .queries import (
     get_programas_cuartel, get_productos_disponibles,
     agregar_producto_semanas, update_dosis, eliminar_producto_cuartel,
     get_productos_lista, get_unidades_lista, save_producto, update_producto_nutrientes,
+    validar_login,
 )
 from .pdf_service import build_pdf, build_pdf_bodega
 
@@ -26,12 +30,91 @@ BASE_DIR = Path(__file__).resolve().parent
 app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
 templates = Jinja2Templates(directory=BASE_DIR / "templates")
 
-ID_RESPONSABLE_DEFAULT = 1  # TODO: reemplazar con auth real
+
+# ══ AUTH MIDDLEWARE ═══════════════════════════════════════════════════════════
+
+PUBLIC_PATHS = {"/login", "/logout", "/health", "/", "/docs", "/openapi.json", "/redoc"}
+PUBLIC_PREFIXES = ("/static", "/papeleta", "/registro-semanal")
+
+
+class AuthMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        path = request.url.path
+        is_public = (
+            path in PUBLIC_PATHS
+            or any(path.startswith(p) for p in PUBLIC_PREFIXES)
+        )
+        if is_public or request.session.get("user_id"):
+            return await call_next(request)
+        return RedirectResponse(url=f"/login?next={path}", status_code=303)
+
+
+# AuthMiddleware primero (interior), SessionMiddleware despues (exterior: corre antes)
+app.add_middleware(AuthMiddleware)
+app.add_middleware(
+    SessionMiddleware,
+    secret_key=os.getenv("SESSION_SECRET_KEY", "dev-insecure-change-me"),
+    session_cookie="ferti_session",
+    max_age=60 * 60 * 12,  # 12h
+    same_site="lax",
+    https_only=False,
+)
 
 
 @app.get("/health")
 def health():
     return {"status": "ok"}
+
+
+# ══ LOGIN / LOGOUT ════════════════════════════════════════════════════════════
+
+@app.get("/login", response_class=HTMLResponse)
+def web_login(request: Request, next: str = "/app/programas"):
+    if request.session.get("user_id"):
+        return RedirectResponse(url=next or "/app/programas", status_code=303)
+    return templates.TemplateResponse(
+        "login.html",
+        {"request": request, "next": next, "error": None, "usuario": ""},
+    )
+
+
+@app.post("/login", response_class=HTMLResponse)
+def do_login(
+    request: Request,
+    usuario: str = Form(...),
+    contrasena: str = Form(...),
+    next: str = Form("/app/programas"),
+):
+    user = validar_login(usuario.strip(), contrasena)
+    if not user:
+        return templates.TemplateResponse(
+            "login.html",
+            {
+                "request": request,
+                "next": next,
+                "error": "Usuario o contraseña incorrectos.",
+                "usuario": usuario,
+            },
+            status_code=401,
+        )
+    nombre = user.get("nombre") or ""
+    apellido = user.get("apellido") or ""
+    request.session["user_id"] = user["id"]
+    request.session["user_usuario"] = user["usuario"]
+    request.session["user_name"] = (nombre + " " + apellido).strip() or user["usuario"]
+    request.session["user_initials"] = ((nombre[:1] + apellido[:1]).upper() or user["usuario"][:2].upper())
+    destino = next if next and next.startswith("/") else "/app/programas"
+    return RedirectResponse(url=destino, status_code=303)
+
+
+@app.get("/logout")
+def do_logout(request: Request):
+    request.session.clear()
+    return RedirectResponse(url="/login", status_code=303)
+
+
+def _id_responsable(request: Request) -> int:
+    return int(request.session.get("user_id") or 0)
 
 
 # ══ WEB APP ═══════════════════════════════════════════════════════════════════
@@ -181,6 +264,7 @@ def preview_unidades(
 
 @app.post("/app/unidades/{id_cuartel}")
 def crear_unidades(
+    request: Request,
     id_cuartel: int,
     id_estimacion: str = Form(...),
     id_vigor: int = Form(...),
@@ -201,7 +285,7 @@ def crear_unidades(
         id_cuartel=id_cuartel,
         id_temporada=id_temporada,
         id_vigor=id_vigor,
-        id_responsable=ID_RESPONSABLE_DEFAULT,
+        id_responsable=_id_responsable(request),
         especie=est["especie"],
         ton_estimadas=float(est["ton_estimadas"]),
         vigor_factor=float(vigor["factor"]),
