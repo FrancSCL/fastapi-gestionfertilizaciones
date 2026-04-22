@@ -138,7 +138,6 @@
           <tr>
             <th class="matriz-semana">
               <div class="matriz-semana-label">{{ fila.semana.etiqueta }}</div>
-              <div class="matriz-week-sub">Sem {{ fila.semana.numero }}</div>
               {% if fila.semana.fecha_inicio and fila.semana.fecha_fin %}
               <div class="matriz-week-dates">
                 {{ fila.semana.fecha_inicio.strftime('%d/%m') }} – {{ fila.semana.fecha_fin.strftime('%d/%m') }}
