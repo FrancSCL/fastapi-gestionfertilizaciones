@@ -37,14 +37,29 @@
 
     {% if ur %}
     <div class="prod-panel-meta">
-      <span class="prod-panel-meta-title">Meta UR (un/ha)</span>
-      <table class="prod-meta-table">
+      <span class="prod-panel-meta-title">Balance (un/ha)</span>
+      <table class="prod-balance-table">
+        <thead>
+          <tr>
+            <th>Nut</th>
+            <th>Req</th>
+            <th>Prog</th>
+            <th>Saldo</th>
+          </tr>
+        </thead>
         <tbody>
           {% set metas = [('N',ur.unidades_N),('K',ur.unidades_K),('P',ur.unidades_P),('Mg',ur.unidades_Mg),('B',ur.unidades_B),('Ca',ur.unidades_Ca),('Zn',ur.unidades_Zn),('Mn',ur.unidades_Mn)] %}
           {% for label, v in metas if v and (v | float) > 0 %}
-          <tr>
+          {% set req = v | float %}
+          {% set prog = (matriz.totales_aporte[label] | default(0)) | float %}
+          {% set saldo = req - prog %}
+          <tr data-nut="{{ label }}" data-req="{{ req }}">
             <th>{{ label }}</th>
-            <td>{{ '%.1f' | format(v | float) }}</td>
+            <td>{{ '%.1f' | format(req) }}</td>
+            <td data-prog-val>{{ '%.1f' | format(prog) }}</td>
+            <td data-saldo-val class="{% if saldo > 0.05 %}is-falta{% elif saldo < -0.05 %}is-sobra{% else %}is-ok{% endif %}">
+              {{ '%.1f' | format(saldo) }}
+            </td>
           </tr>
           {% endfor %}
         </tbody>
@@ -256,7 +271,9 @@
       }
     }
 
-    // Resumen lateral: tabla agrupada por producto
+    // Resumen lateral: tabla agrupada por producto + acumulado global por nutriente
+    const nutSum = {N:0,K:0,P:0,Mg:0,B:0,Ca:0,Zn:0,Mn:0};
+
     document.querySelectorAll('.prod-summary-group').forEach(grp => {
       const idx = parseInt(grp.dataset.prodIdx || '-1', 10);
       if (idx < 0 || idx >= n) return;
@@ -271,12 +288,34 @@
       let pct = {};
       try { pct = JSON.parse(grp.dataset.pct || '{}'); } catch (e) {}
 
+      Object.keys(nutSum).forEach(nut => {
+        nutSum[nut] += kgHa * ((pct && pct[nut]) || 0);
+      });
+
       grp.querySelectorAll('.prod-summary-nut-row').forEach(row => {
         const nut = row.dataset.nut;
         const p = (pct && pct[nut]) || 0;
         const valEl = row.querySelector('[data-nut-val]');
         if (valEl) valEl.textContent = (kgHa * p).toFixed(1);
       });
+    });
+
+    // Tabla de balance: Req | Prog | Saldo
+    document.querySelectorAll('.prod-balance-table tbody tr').forEach(tr => {
+      const nut = tr.dataset.nut;
+      const req = parseFloat(tr.dataset.req) || 0;
+      const prog = nutSum[nut] || 0;
+      const saldo = req - prog;
+      const tdProg = tr.querySelector('[data-prog-val]');
+      const tdSaldo = tr.querySelector('[data-saldo-val]');
+      if (tdProg) tdProg.textContent = prog.toFixed(1);
+      if (tdSaldo) {
+        tdSaldo.textContent = saldo.toFixed(1);
+        tdSaldo.classList.remove('is-falta','is-sobra','is-ok');
+        if (saldo > 0.05) tdSaldo.classList.add('is-falta');
+        else if (saldo < -0.05) tdSaldo.classList.add('is-sobra');
+        else tdSaldo.classList.add('is-ok');
+      }
     });
   }
 

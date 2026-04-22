@@ -1207,6 +1207,61 @@ h4 { font-size: 0.875rem; text-transform: uppercase; letter-spacing: 0.04em; col
   font-weight: 600;
 }
 
+/* Balance Req / Prog / Saldo por nutriente */
+.prod-balance-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+
+.prod-balance-table thead th {
+  font-size: 0.625rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-weight: 700;
+  color: var(--lh-700);
+  padding: 4px 6px;
+  border-bottom: 1px solid var(--lh-200);
+  text-align: right;
+}
+
+.prod-balance-table thead th:first-child {
+  text-align: left;
+}
+
+.prod-balance-table tbody th {
+  font-weight: 700;
+  color: var(--lh-800);
+  font-size: 0.75rem;
+  padding: 4px 6px;
+  text-align: left;
+}
+
+.prod-balance-table tbody td {
+  padding: 4px 6px;
+  font-size: 0.75rem;
+  text-align: right;
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.prod-balance-table tbody tr + tr th,
+.prod-balance-table tbody tr + tr td {
+  border-top: 1px dashed var(--lh-100);
+}
+
+.prod-balance-table .is-falta {
+  color: #b91c1c;
+}
+
+.prod-balance-table .is-sobra {
+  color: #b45309;
+}
+
+.prod-balance-table .is-ok {
+  color: var(--lh-700);
+}
+
 .prod-panel-body {
   flex: 1 1 auto;
   overflow-y: auto;
