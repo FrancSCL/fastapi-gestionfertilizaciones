@@ -522,7 +522,8 @@ def get_productos_disponibles(id_cuartel: int, id_temporada: int | None = None) 
     sql = f"""
         SELECT id, nombre_comercial
         FROM DIM_AREATECNICA_FITO_PRODUCTO
-        WHERE id NOT IN (
+        WHERE id_actividad = 5
+          AND id NOT IN (
             SELECT DISTINCT id_producto
             FROM FACT_AREATECNICA_FERTILIZACION_PRODUCTOSPROGRAMA
             WHERE id_fertilizacion IN ({ph})
