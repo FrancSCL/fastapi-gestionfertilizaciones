@@ -849,6 +849,15 @@ h4 { font-size: 0.875rem; text-transform: uppercase; letter-spacing: 0.04em; col
   margin-top: 2px;
 }
 
+.matriz-week-dates {
+  font-size: 0.625rem;
+  color: var(--lh-700);
+  font-weight: 600;
+  margin-top: 2px;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+}
+
 .matriz-cell {
   padding: var(--sp-2) var(--sp-2);
   text-align: center;
