@@ -124,6 +124,23 @@
         </button>
         <span class="topbar-title">{% block topbar_title %}Fertilizaciones{% endblock %}</span>
         {% block topbar_extra %}{% endblock %}
+
+        {% if request.state.sucursales_all %}
+        <form method="post" action="/set-sucursal" class="sucursal-switcher">
+          <input type="hidden" name="next" value="{{ request.url.path }}">
+          <label class="sucursal-switcher-label" for="sucursal-select">Sucursal</label>
+          <select id="sucursal-select" name="id_sucursal" class="sucursal-switcher-select"
+                  onchange="this.form.submit()">
+            <option value="">Todas</option>
+            {% for s in request.state.sucursales_all %}
+            <option value="{{ s.id }}"
+                    {% if request.state.id_sucursal_activa == s.id %}selected{% endif %}>
+              {{ s.sucursal }}
+            </option>
+            {% endfor %}
+          </select>
+        </form>
+        {% endif %}
       </header>
 
       <div class="page-body" hx-indicator="#global-indicator">

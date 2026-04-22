@@ -49,7 +49,23 @@ class AuthMiddleware(BaseHTTPMiddleware):
         return RedirectResponse(url=f"/login?next={path}", status_code=303)
 
 
-# AuthMiddleware primero (interior), SessionMiddleware despues (exterior: corre antes)
+class ContextMiddleware(BaseHTTPMiddleware):
+    """Inyecta sucursal activa + listado de sucursales en request.state para los templates."""
+    async def dispatch(self, request: Request, call_next):
+        suc = request.session.get("id_sucursal")
+        request.state.id_sucursal_activa = int(suc) if suc else None
+        if not hasattr(app.state, "sucursales_cache") or not app.state.sucursales_cache:
+            try:
+                app.state.sucursales_cache = get_sucursales()
+            except Exception:
+                app.state.sucursales_cache = []
+        request.state.sucursales_all = app.state.sucursales_cache
+        return await call_next(request)
+
+
+# Orden de add_middleware: el primero agregado es el mas interior.
+# Ejecucion entrante: Session -> Auth -> Context -> endpoint
+app.add_middleware(ContextMiddleware)
 app.add_middleware(AuthMiddleware)
 app.add_middleware(
     SessionMiddleware,
@@ -59,6 +75,14 @@ app.add_middleware(
     same_site="lax",
     https_only=False,
 )
+
+
+def _id_sucursal(request: Request, query_value: int | None) -> int | None:
+    """Prioridad: query param explicito > sucursal en sesion > None."""
+    if query_value is not None:
+        return query_value
+    s = request.session.get("id_sucursal")
+    return int(s) if s else None
 
 
 @app.get("/health")
@@ -113,6 +137,23 @@ def do_logout(request: Request):
     return RedirectResponse(url="/login", status_code=303)
 
 
+@app.post("/set-sucursal")
+def set_sucursal(
+    request: Request,
+    id_sucursal: str = Form(""),
+    next: str = Form("/app/programas"),
+):
+    if not id_sucursal or id_sucursal in ("none", "0"):
+        request.session.pop("id_sucursal", None)
+    else:
+        try:
+            request.session["id_sucursal"] = int(id_sucursal)
+        except ValueError:
+            pass
+    destino = next if next and next.startswith("/") else "/app/programas"
+    return RedirectResponse(url=destino, status_code=303)
+
+
 def _id_responsable(request: Request) -> int:
     return int(request.session.get("user_id") or 0)
 
@@ -127,9 +168,10 @@ def app_root():
 @app.get("/app/programas", response_class=HTMLResponse)
 def web_programas(request: Request, temporada: int | None = None, sucursal: int | None = None):
     temporadas = get_temporadas()
-    cuarteles = listar_cuarteles_con_programas(id_temporada=temporada, id_sucursal=sucursal)
+    id_suc = _id_sucursal(request, sucursal)
+    cuarteles = listar_cuarteles_con_programas(id_temporada=temporada, id_sucursal=id_suc)
     grupos = agrupar_por_sucursal(cuarteles)
-    semanas = get_semanas_disponibles(id_temporada=temporada, id_sucursal=sucursal)
+    semanas = get_semanas_disponibles(id_temporada=temporada, id_sucursal=id_suc)
     return templates.TemplateResponse(
         "programas.html",
         {
@@ -140,7 +182,7 @@ def web_programas(request: Request, temporada: int | None = None, sucursal: int 
             "grupos": grupos,
             "total_cuarteles": len(cuarteles),
             "filtro_temporada": temporada,
-            "filtro_sucursal": sucursal,
+            "filtro_sucursal": id_suc,
             "semanas": semanas,
         },
     )
@@ -191,8 +233,9 @@ def web_listado_ur(
 ):
     if estado not in ("con_ur", "sin_ur", "todos"):
         estado = "sin_ur"
+    id_suc = _id_sucursal(request, sucursal)
     cuarteles = listar_cuarteles_con_programas(
-        id_temporada=temporada, id_sucursal=sucursal, filtro_ur=estado
+        id_temporada=temporada, id_sucursal=id_suc, filtro_ur=estado
     )
     return templates.TemplateResponse(
         "unidades_listado.html",
@@ -204,7 +247,7 @@ def web_listado_ur(
             "grupos": agrupar_por_sucursal(cuarteles),
             "total_cuarteles": len(cuarteles),
             "filtro_temporada": temporada,
-            "filtro_sucursal": sucursal,
+            "filtro_sucursal": id_suc,
             "filtro_estado": estado,
         },
     )

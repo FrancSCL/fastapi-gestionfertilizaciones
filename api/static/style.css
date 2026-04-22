@@ -330,6 +330,46 @@ h4 { font-size: 0.875rem; text-transform: uppercase; letter-spacing: 0.04em; col
   margin-left: var(--sp-1);
 }
 
+/* Selector global de sucursal */
+.sucursal-switcher {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
+
+.sucursal-switcher-label {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--lh-700);
+}
+
+.sucursal-switcher-select {
+  font-family: inherit;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--lh-900);
+  background: var(--lh-50);
+  border: 1px solid var(--lh-200);
+  border-radius: 6px;
+  padding: 6px 10px;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+  min-width: 160px;
+}
+
+.sucursal-switcher-select:hover {
+  border-color: var(--lh-400);
+}
+
+.sucursal-switcher-select:focus {
+  outline: none;
+  border-color: var(--lh-500);
+  background: white;
+}
+
 /* Page body */
 .page-body {
   flex: 1;
