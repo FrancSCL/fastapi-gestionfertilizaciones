@@ -131,7 +131,6 @@
               </div>
             </th>
             {% endfor %}
-            <th class="matriz-total">Total kg/ha</th>
           </tr>
         </thead>
         <tbody>
@@ -160,7 +159,6 @@
               {% endif %}
             </td>
             {% endfor %}
-            <td class="matriz-cell matriz-cell-total">{{ '%.1f' | format(fila.total_kg) }}</td>
           </tr>
           {% endfor %}
         </tbody>
@@ -171,9 +169,6 @@
             {% for t in matriz.totales_prod %}
             <td class="matriz-cell">{{ '%.1f' | format(t) }}</td>
             {% endfor %}
-            <td class="matriz-cell matriz-cell-total">
-              {{ '%.1f' | format(matriz.totales_prod | sum) }}
-            </td>
           </tr>
           <tr class="matriz-tfoot matriz-tfoot-bloque" title="kg totales según superficie productiva">
             <th class="matriz-corner">Total kg/supprod</th>
@@ -182,9 +177,6 @@
               {{ '%.1f' | format(t * (cuartel.sup_productiva | float)) }}
             </td>
             {% endfor %}
-            <td class="matriz-cell matriz-cell-total">
-              {{ '%.1f' | format((matriz.totales_prod | sum) * (cuartel.sup_productiva | float)) }}
-            </td>
           </tr>
         </tfoot>
         {% endif %}
