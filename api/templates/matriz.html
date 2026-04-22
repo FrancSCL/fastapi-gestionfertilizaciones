@@ -74,7 +74,7 @@
           </tr>
           {% for nut in ['N','K','P','Mg','B','Ca','Zn','Mn'] %}
           {% if prod.pct[nut] > 0 %}
-          {% set un = kg_ha * prod.pct[nut] / 100 %}
+          {% set un = kg_ha * prod.pct[nut] %}
           <tr class="prod-summary-nut-row" data-nut="{{ nut }}">
             <th>{{ nut }}</th>
             <td data-nut-val>{{ '%.1f' | format(un) }}</td>
@@ -279,7 +279,7 @@
         const nut = row.dataset.nut;
         const p = (pct && pct[nut]) || 0;
         const valEl = row.querySelector('[data-nut-val]');
-        if (valEl) valEl.textContent = (kgHa * p / 100).toFixed(1);
+        if (valEl) valEl.textContent = (kgHa * p).toFixed(1);
       });
     });
   }

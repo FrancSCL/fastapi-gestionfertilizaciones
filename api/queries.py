@@ -242,7 +242,7 @@ def build_matriz(semanas_rows: list, productos_rows: list) -> dict:
         any_val = False
         for prod, total_kg in zip(productos_list, totales_prod):
             pct = prod["pct"][nut]
-            units = round(total_kg * pct / 100.0, 2) if pct > 0 else 0.0
+            units = round(total_kg * pct, 2) if pct > 0 else 0.0
             fila_nut.append(units)
             if units > 0:
                 any_val = True
