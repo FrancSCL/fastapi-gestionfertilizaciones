@@ -125,6 +125,23 @@
         <span class="topbar-title">{% block topbar_title %}Fertilizaciones{% endblock %}</span>
         {% block topbar_extra %}{% endblock %}
 
+        {% if request.state.temporadas_all %}
+        <form method="post" action="/set-temporada" class="sucursal-switcher">
+          <input type="hidden" name="next" value="{{ request.url.path }}">
+          <label class="sucursal-switcher-label" for="temporada-select">Temporada</label>
+          <select id="temporada-select" name="id_temporada" class="sucursal-switcher-select"
+                  onchange="this.form.submit()">
+            <option value="">Todas</option>
+            {% for t in request.state.temporadas_all %}
+            <option value="{{ t.id }}"
+                    {% if request.state.id_temporada_activa == t.id %}selected{% endif %}>
+              {{ t.temporada }}
+            </option>
+            {% endfor %}
+          </select>
+        </form>
+        {% endif %}
+
         {% if request.state.sucursales_all %}
         <form method="post" action="/set-sucursal" class="sucursal-switcher">
           <input type="hidden" name="next" value="{{ request.url.path }}">
