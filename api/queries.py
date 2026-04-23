@@ -443,6 +443,7 @@ def get_productos_lista() -> list:
         FROM DIM_AREATECNICA_FITO_PRODUCTO p
         LEFT JOIN DIM_GENERAL_UNIDAD u ON u.id = p.id_unidad
         LEFT JOIN DIM_AREATECNICA_FITO_PRODUCTONUTRIENTES pn ON pn.id_producto = p.id
+        WHERE p.id_actividad = 5
         ORDER BY p.nombre_comercial
     """
     with get_connection() as conn:
@@ -470,8 +471,8 @@ def save_producto(nombre_comercial: str, id_unidad: int, codigo_softland: int | 
         with conn.cursor() as cur:
             cur.execute(
                 """INSERT INTO DIM_AREATECNICA_FITO_PRODUCTO
-                   (id, nombre_comercial, id_unidad, codigo_softland)
-                   VALUES (%s, %s, %s, %s)""",
+                   (id, nombre_comercial, id_unidad, codigo_softland, id_actividad)
+                   VALUES (%s, %s, %s, %s, 5)""",
                 (id_prod, nombre_comercial, id_unidad, codigo_softland or None),
             )
             cur.execute(
