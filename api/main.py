@@ -460,8 +460,10 @@ def crear_producto(
     zn: float = Form(0),
     mn: float = Form(0),
 ):
+    # UI envia 0-100, BD guarda fracciones 0-1
     save_producto(nombre_comercial, id_unidad, codigo_softland,
-                  n, k, p, mg, b, ca, zn, mn, eficiencia)
+                  n/100, k/100, p/100, mg/100, b/100, ca/100, zn/100, mn/100,
+                  eficiencia/100)
     return RedirectResponse(url="/app/parametros/productos", status_code=303)
 
 
@@ -478,7 +480,12 @@ def editar_nutrientes(
     zn: float = Form(0),
     mn: float = Form(0),
 ):
-    update_producto_nutrientes(id_producto, n, k, p, mg, b, ca, zn, mn, eficiencia)
+    # UI envia 0-100, BD guarda fracciones 0-1
+    update_producto_nutrientes(
+        id_producto,
+        n/100, k/100, p/100, mg/100, b/100, ca/100, zn/100, mn/100,
+        eficiencia/100,
+    )
     return RedirectResponse(url="/app/parametros/productos", status_code=303)
 
 

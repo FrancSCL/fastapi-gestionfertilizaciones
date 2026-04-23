@@ -1,129 +1,241 @@
 {% extends "base.html" %}
 
 {% block title %}Productos{% endblock %}
-{% block topbar_title %}Productos{% endblock %}
+{% block topbar_title %}Productos · Fertilizantes{% endblock %}
 
 {% block topbar_extra %}
-<button class="filter-btn" style="margin-left:auto;"
-        onclick="document.getElementById('form-nuevo').classList.toggle('hidden')">
-  + Agregar producto
+<button type="button" class="prod-new-btn" onclick="openDrawer()">
+  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+    <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+  </svg>
+  Nuevo producto
 </button>
 {% endblock %}
 
 {% block content %}
+<div class="prod-page">
 
-<!-- Formulario nuevo producto -->
-<div id="form-nuevo" class="data-table-wrap hidden" style="margin-bottom:var(--sp-5);">
-  <div class="data-table-header"><h2>Nuevo producto</h2></div>
-  <form method="post" action="/app/parametros/productos" class="prod-form">
-    <div class="prod-form-grid">
-      <div class="form-group prod-form-nombre">
-        <label class="filter-label">Nombre comercial</label>
-        <input class="param-input" type="text" name="nombre_comercial" required placeholder="Ej: Urea Granulada">
-      </div>
-      <div class="form-group">
-        <label class="filter-label">Unidad</label>
-        <select class="filter-select" name="id_unidad" required>
-          {% for u in unidades %}
-          <option value="{{ u.id }}">{{ u.abreviatura }}</option>
+  <!-- Buscador -->
+  <div class="prod-search-bar">
+    <div class="prod-search-wrap">
+      <svg class="prod-search-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+      </svg>
+      <input id="prodSearch" type="text" class="prod-search-input"
+             placeholder="Buscar producto por nombre o código…" autofocus>
+      <button type="button" class="prod-search-clear" onclick="clearSearch()" aria-label="Limpiar">
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="6" y1="6" x2="18" y2="18"/><line x1="6" y1="18" x2="18" y2="6"/></svg>
+      </button>
+    </div>
+    <div class="prod-counter">
+      <span id="prodCount">{{ productos|length }}</span> /
+      <span class="prod-counter-total">{{ productos|length }}</span>
+    </div>
+  </div>
+
+  <!-- Lista de productos -->
+  <ol class="prod-list" id="prodList">
+    {% for p in productos %}
+    {%- set efic   = (p.eficiencia_fertilizante or 0) | float -%}
+    {%- set efic_p = (efic * 100)                              -%}
+    <li class="prod-card" data-name="{{ p.nombre_comercial | lower }}" data-code="{{ p.codigo_softland or '' }}">
+      <button type="button" class="prod-card-summary" onclick="toggleCard(this)" aria-expanded="false">
+        <span class="prod-card-name">
+          {{ p.nombre_comercial }}
+          {% if p.codigo_softland %}<span class="prod-card-sku">#{{ p.codigo_softland }}</span>{% endif %}
+        </span>
+        <span class="prod-card-summary-meta">
+          {% if p.unidad %}<span class="prod-card-unit">{{ p.unidad }}</span>{% endif %}
+          {% set tags = [] %}
+          {% for nut in [('n','N'),('k','K'),('p','P'),('mg','Mg'),('b','B'),('ca','Ca'),('zn','Zn'),('mn','Mn')] %}
+            {% set v = (p[nut[0]] or 0) | float %}
+            {% if v > 0 %}
+              {% set _ = tags.append(nut[1] ~ ' ' ~ ('%g' | format((v*100) | round(2))) ~ '%') %}
+            {% endif %}
           {% endfor %}
-        </select>
-      </div>
-      <div class="form-group">
-        <label class="filter-label">Cód. Softland</label>
-        <input class="param-input param-input-num" type="number" name="codigo_softland" placeholder="—">
-      </div>
-      <div class="form-group">
-        <label class="filter-label">Eficiencia %</label>
-        <input class="param-input param-input-num" type="number" step="0.1" name="eficiencia" value="100">
-      </div>
-    </div>
+          {% if tags %}
+            <span class="prod-card-aportes">{{ tags | join(' · ') }}</span>
+          {% else %}
+            <span class="prod-card-aportes prod-card-aportes-empty">sin aportes cargados</span>
+          {% endif %}
+          <span class="prod-card-efic">efic {{ '%g' | format(efic_p | round(0)) }}%</span>
+        </span>
+        <svg class="prod-card-chevron" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="6 9 12 15 18 9"/>
+        </svg>
+      </button>
 
-    <div class="prod-nutrientes-grid">
-      {% for nut in [('n','N'),('k','K'),('p','P'),('mg','Mg'),('b','B'),('ca','Ca'),('zn','Zn'),('mn','Mn')] %}
-      <div class="form-group">
-        <label class="filter-label">% {{ nut[1] }}</label>
-        <input class="param-input param-input-num" type="number" step="0.01" min="0" max="100"
-               name="{{ nut[0] }}" value="0">
-      </div>
-      {% endfor %}
-    </div>
+      <form class="prod-card-detail"
+            method="post"
+            action="/app/parametros/productos/{{ p.id }}/nutrientes"
+            hx-post="/app/parametros/productos/{{ p.id }}/nutrientes"
+            hx-trigger="change from:input delay:400ms"
+            hx-swap="none"
+            hx-on::before-request="this.classList.add('saving');this.classList.remove('saved')"
+            hx-on::after-request="this.classList.remove('saving');if(event.detail.successful){this.classList.add('saved');setTimeout(()=>this.classList.remove('saved'),900)}">
 
-    <div class="ur-form-footer" style="display:flex;gap:var(--sp-3);">
-      <button type="submit" class="filter-btn">Guardar producto</button>
-      <button type="button" class="filter-btn filter-btn-ghost"
-              onclick="document.getElementById('form-nuevo').classList.add('hidden')">Cancelar</button>
-    </div>
-  </form>
+        <div class="prod-detail-grid">
+          <div class="prod-detail-section">
+            <span class="prod-detail-section-title">Eficiencia</span>
+            <div class="prod-detail-efic">
+              <input type="number" step="1" min="0" max="100" name="eficiencia"
+                     value="{{ '%g' | format(efic_p | round(0)) }}"
+                     data-store="frac"
+                     class="prod-input prod-input-efic">
+              <span class="prod-input-suffix">%</span>
+            </div>
+          </div>
+
+          <div class="prod-detail-section prod-detail-aportes">
+            <span class="prod-detail-section-title">Aportes <span class="prod-detail-section-hint">(% del peso del producto)</span></span>
+            <div class="prod-nut-grid">
+              {% for nut in [('n','N'),('k','K'),('p','P'),('mg','Mg'),('b','B'),('ca','Ca'),('zn','Zn'),('mn','Mn')] %}
+              {%- set v = (p[nut[0]] or 0) | float * 100 -%}
+              <label class="prod-nut">
+                <span class="prod-nut-label">{{ nut[1] }}</span>
+                <input type="number" step="0.01" min="0" max="100" name="{{ nut[0] }}"
+                       value="{{ '%g' | format(v | round(2)) }}"
+                       data-store="frac"
+                       class="prod-input prod-nut-input">
+                <span class="prod-input-suffix">%</span>
+              </label>
+              {% endfor %}
+            </div>
+          </div>
+        </div>
+
+        <div class="prod-detail-footer">
+          <span class="prod-save-status">
+            <span class="prod-save-saving">guardando…</span>
+            <span class="prod-save-saved">guardado</span>
+            <span class="prod-save-idle">los cambios se guardan al salir del campo</span>
+          </span>
+        </div>
+      </form>
+    </li>
+    {% else %}
+    <li class="prod-empty">
+      <p>No hay productos fertilizantes cargados.</p>
+      <button type="button" class="prod-new-btn" onclick="openDrawer()">+ Crear el primero</button>
+    </li>
+    {% endfor %}
+  </ol>
+
+  <p class="prod-empty prod-empty-search hidden" id="prodNoMatch">
+    Ningún producto coincide con tu búsqueda.
+  </p>
 </div>
 
-<!-- Tabla de productos -->
-<div class="data-table-wrap">
-  <div class="data-table-header">
-    <h2>Productos</h2>
-    <span class="data-table-count">{{ productos|length }} producto{% if productos|length != 1 %}s{% endif %}</span>
-  </div>
-  <div style="overflow-x:auto;">
-    <table class="data-table">
-      <thead>
-        <tr>
-          <th>Producto</th>
-          <th>Unidad</th>
-          <th class="num">Efic. %</th>
-          <th class="num">N</th>
-          <th class="num">K</th>
-          <th class="num">P</th>
-          <th class="num">Mg</th>
-          <th class="num">B</th>
-          <th class="num">Ca</th>
-          <th class="num">Zn</th>
-          <th class="num">Mn</th>
-          <th></th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for p in productos %}
-        <tr>
-          <form method="post" action="/app/parametros/productos/{{ p.id }}/nutrientes" style="display:contents">
-            <td class="cuartel-name">
-              {{ p.nombre_comercial }}
-              {% if p.codigo_softland %}<span class="sup-unit" style="margin-left:4px;">#{{ p.codigo_softland }}</span>{% endif %}
-            </td>
-            <td>{{ p.unidad or '—' }}</td>
-            {% for col in ['eficiencia_fertilizante','n','k','p','mg','b','ca','zn','mn'] %}
-            <td class="num">
-              <input class="param-input param-input-num"
-                     type="number" step="0.01" min="0"
-                     name="{{ 'eficiencia' if col == 'eficiencia_fertilizante' else col }}"
-                     value="{{ p[col] or 0 }}">
-            </td>
+<!-- Drawer: nuevo producto -->
+<div class="prod-drawer" id="prodDrawer" aria-hidden="true">
+  <div class="prod-drawer-overlay" onclick="closeDrawer()"></div>
+  <aside class="prod-drawer-panel">
+    <header class="prod-drawer-head">
+      <h2 class="prod-drawer-title">Nuevo producto</h2>
+      <button type="button" class="prod-drawer-close" onclick="closeDrawer()" aria-label="Cerrar">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="6" y1="6" x2="18" y2="18"/><line x1="6" y1="18" x2="18" y2="6"/></svg>
+      </button>
+    </header>
+
+    <form class="prod-drawer-form" method="post" action="/app/parametros/productos">
+      <div class="prod-drawer-field">
+        <label class="prod-drawer-label">Nombre comercial</label>
+        <input type="text" name="nombre_comercial" required placeholder="Ej: Urea Granulada"
+               class="prod-input">
+      </div>
+
+      <div class="prod-drawer-row">
+        <div class="prod-drawer-field">
+          <label class="prod-drawer-label">Unidad</label>
+          <select name="id_unidad" required class="prod-input">
+            {% for u in unidades %}
+            <option value="{{ u.id }}">{{ u.abreviatura }}{% if u.unidad %} — {{ u.unidad }}{% endif %}</option>
             {% endfor %}
-            <td><button class="param-save-btn" type="submit">Guardar</button></td>
-          </form>
-        </tr>
-        {% else %}
-        <tr>
-          <td colspan="12">
-            <div class="empty-state" style="padding:var(--sp-6);">
-              <p class="empty-state-text">No hay productos. Usa el botón + Agregar producto.</p>
-            </div>
-          </td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
+          </select>
+        </div>
+        <div class="prod-drawer-field">
+          <label class="prod-drawer-label">Cód. Softland</label>
+          <input type="number" name="codigo_softland" placeholder="opcional" class="prod-input">
+        </div>
+        <div class="prod-drawer-field">
+          <label class="prod-drawer-label">Eficiencia %</label>
+          <input type="number" step="1" min="0" max="100" name="eficiencia" value="100" class="prod-input">
+        </div>
+      </div>
+
+      <div class="prod-drawer-section">
+        <span class="prod-drawer-section-title">Aportes <span class="prod-detail-section-hint">(% del peso del producto)</span></span>
+        <div class="prod-nut-grid prod-nut-grid-form">
+          {% for nut in [('n','N'),('k','K'),('p','P'),('mg','Mg'),('b','B'),('ca','Ca'),('zn','Zn'),('mn','Mn')] %}
+          <label class="prod-nut">
+            <span class="prod-nut-label">{{ nut[1] }}</span>
+            <input type="number" step="0.01" min="0" max="100" name="{{ nut[0] }}" value="0"
+                   class="prod-input prod-nut-input">
+            <span class="prod-input-suffix">%</span>
+          </label>
+          {% endfor %}
+        </div>
+      </div>
+
+      <div class="prod-drawer-footer">
+        <button type="button" class="prod-btn prod-btn-ghost" onclick="closeDrawer()">Cancelar</button>
+        <button type="submit" class="prod-btn">Crear producto</button>
+      </div>
+    </form>
+  </aside>
 </div>
 {% endblock %}
 
 {% block scripts %}
 <script>
-  // Calcula preview de unidades al escribir dosis
-  document.querySelectorAll('.prod-nutrientes-grid input').forEach(inp => {
-    inp.addEventListener('input', () => {
-      const n = parseFloat(document.querySelector('[name=n]')?.value || 0);
-      // preview solo informativo, no hace nada más por ahora
+  // Toggle expand
+  function toggleCard(btn) {
+    const card = btn.closest('.prod-card');
+    const expanded = card.classList.toggle('is-open');
+    btn.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+  }
+
+  // Buscador en vivo
+  const searchInput = document.getElementById('prodSearch');
+  const cards = Array.from(document.querySelectorAll('.prod-card'));
+  const counter = document.getElementById('prodCount');
+  const noMatch = document.getElementById('prodNoMatch');
+
+  function applyFilter() {
+    const q = searchInput.value.trim().toLowerCase();
+    let shown = 0;
+    cards.forEach(c => {
+      const hay = c.dataset.name.includes(q) || c.dataset.code.includes(q);
+      c.classList.toggle('hidden', !hay);
+      if (hay) shown++;
     });
+    counter.textContent = shown;
+    noMatch.classList.toggle('hidden', shown > 0 || cards.length === 0);
+  }
+  searchInput.addEventListener('input', applyFilter);
+
+  function clearSearch() {
+    searchInput.value = '';
+    applyFilter();
+    searchInput.focus();
+  }
+
+  // Drawer
+  function openDrawer() {
+    document.getElementById('prodDrawer').classList.add('is-open');
+    document.getElementById('prodDrawer').setAttribute('aria-hidden', 'false');
+  }
+  function closeDrawer() {
+    document.getElementById('prodDrawer').classList.remove('is-open');
+    document.getElementById('prodDrawer').setAttribute('aria-hidden', 'true');
+  }
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') closeDrawer();
+    if ((e.key === '/' || e.key === 'k' && e.metaKey) && document.activeElement !== searchInput) {
+      e.preventDefault();
+      searchInput.focus();
+    }
   });
+
 </script>
 {% endblock %}
