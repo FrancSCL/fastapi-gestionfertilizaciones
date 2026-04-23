@@ -452,7 +452,7 @@ def get_productos_lista() -> list:
 
 
 def get_unidades_lista() -> list:
-    sql = "SELECT id, abreviatura, unidad FROM DIM_GENERAL_UNIDAD ORDER BY abreviatura"
+    sql = "SELECT id, abreviatura, nombre AS unidad FROM DIM_GENERAL_UNIDAD ORDER BY abreviatura"
     with get_connection() as conn:
         with conn.cursor() as cur:
             cur.execute(sql)
