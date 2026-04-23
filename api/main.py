@@ -54,20 +54,12 @@ class ContextMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         suc = request.session.get("id_sucursal")
         request.state.id_sucursal_activa = int(suc) if suc else None
-        tmp = request.session.get("id_temporada")
-        request.state.id_temporada_activa = int(tmp) if tmp else None
         if not hasattr(app.state, "sucursales_cache") or not app.state.sucursales_cache:
             try:
                 app.state.sucursales_cache = get_sucursales()
             except Exception:
                 app.state.sucursales_cache = []
         request.state.sucursales_all = app.state.sucursales_cache
-        if not hasattr(app.state, "temporadas_cache") or not app.state.temporadas_cache:
-            try:
-                app.state.temporadas_cache = get_temporadas()
-            except Exception:
-                app.state.temporadas_cache = []
-        request.state.temporadas_all = app.state.temporadas_cache
         return await call_next(request)
 
 
@@ -91,14 +83,6 @@ def _id_sucursal(request: Request, query_value: int | None) -> int | None:
         return query_value
     s = request.session.get("id_sucursal")
     return int(s) if s else None
-
-
-def _id_temporada(request: Request, query_value: int | None) -> int | None:
-    """Prioridad: query param explicito > temporada en sesion > None."""
-    if query_value is not None:
-        return query_value
-    t = request.session.get("id_temporada")
-    return int(t) if t else None
 
 
 @app.get("/health")
@@ -170,23 +154,6 @@ def set_sucursal(
     return RedirectResponse(url=destino, status_code=303)
 
 
-@app.post("/set-temporada")
-def set_temporada(
-    request: Request,
-    id_temporada: str = Form(""),
-    next: str = Form("/app/programas"),
-):
-    if not id_temporada or id_temporada in ("none", "0"):
-        request.session.pop("id_temporada", None)
-    else:
-        try:
-            request.session["id_temporada"] = int(id_temporada)
-        except ValueError:
-            pass
-    destino = next if next and next.startswith("/") else "/app/programas"
-    return RedirectResponse(url=destino, status_code=303)
-
-
 def _id_responsable(request: Request) -> int:
     return int(request.session.get("user_id") or 0)
 
@@ -202,10 +169,9 @@ def app_root():
 def web_programas(request: Request, temporada: int | None = None, sucursal: int | None = None):
     temporadas = get_temporadas()
     id_suc = _id_sucursal(request, sucursal)
-    id_temp = _id_temporada(request, temporada)
-    cuarteles = listar_cuarteles_con_programas(id_temporada=id_temp, id_sucursal=id_suc)
+    cuarteles = listar_cuarteles_con_programas(id_temporada=temporada, id_sucursal=id_suc)
     grupos = agrupar_por_sucursal(cuarteles)
-    semanas = get_semanas_disponibles(id_temporada=id_temp, id_sucursal=id_suc)
+    semanas = get_semanas_disponibles(id_temporada=temporada, id_sucursal=id_suc)
     return templates.TemplateResponse(
         "programas.html",
         {
@@ -215,7 +181,7 @@ def web_programas(request: Request, temporada: int | None = None, sucursal: int 
             "sucursales": get_sucursales(),
             "grupos": grupos,
             "total_cuarteles": len(cuarteles),
-            "filtro_temporada": id_temp,
+            "filtro_temporada": temporada,
             "filtro_sucursal": id_suc,
             "semanas": semanas,
         },
@@ -234,9 +200,9 @@ def web_matriz(request: Request, id_cuartel: int, temporada: int | None = None):
         raise HTTPException(status_code=404, detail="Cuartel no encontrado")
 
     temporadas = get_temporadas()
-    id_temp = _id_temporada(request, temporada) or (temporadas[0]["id"] if temporadas else None)
+    id_temp = temporada or (temporadas[0]["id"] if temporadas else None)
 
-    semanas_rows = get_semanas_cuartel(id_cuartel, id_temporada=id_temp)
+    semanas_rows = get_semanas_cuartel(id_cuartel, id_temporada=temporada)
     ids_prog = [s["id_programa"] for s in semanas_rows]
     productos_rows = get_productos_asignados(ids_prog)
     matriz = build_matriz(semanas_rows, productos_rows)
@@ -251,7 +217,7 @@ def web_matriz(request: Request, id_cuartel: int, temporada: int | None = None):
             "matriz": matriz,
             "ur": ur,
             "temporadas": temporadas,
-            "filtro_temporada": id_temp,
+            "filtro_temporada": temporada,
         },
     )
 
@@ -268,9 +234,8 @@ def web_listado_ur(
     if estado not in ("con_ur", "sin_ur", "todos"):
         estado = "sin_ur"
     id_suc = _id_sucursal(request, sucursal)
-    id_temp = _id_temporada(request, temporada)
     cuarteles = listar_cuarteles_con_programas(
-        id_temporada=id_temp, id_sucursal=id_suc, filtro_ur=estado
+        id_temporada=temporada, id_sucursal=id_suc, filtro_ur=estado
     )
     return templates.TemplateResponse(
         "unidades_listado.html",
@@ -281,7 +246,7 @@ def web_listado_ur(
             "sucursales": get_sucursales(),
             "grupos": agrupar_por_sucursal(cuarteles),
             "total_cuarteles": len(cuarteles),
-            "filtro_temporada": id_temp,
+            "filtro_temporada": temporada,
             "filtro_sucursal": id_suc,
             "filtro_estado": estado,
         },
@@ -295,7 +260,6 @@ def web_unidades(request: Request, id_cuartel: int, temporada: int | None = None
         raise HTTPException(status_code=404, detail="Cuartel no encontrado")
 
     temporadas = get_temporadas()
-    id_temp = _id_temporada(request, temporada)
     estimaciones = get_estimaciones_cuartel(id_cuartel)
 
     return templates.TemplateResponse(
@@ -307,7 +271,7 @@ def web_unidades(request: Request, id_cuartel: int, temporada: int | None = None
             "temporadas": temporadas,
             "vigores": get_vigores(),
             "estimaciones": estimaciones,
-            "filtro_temporada": id_temp,
+            "filtro_temporada": temporada,
         },
     )
 
