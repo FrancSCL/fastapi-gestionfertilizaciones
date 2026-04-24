@@ -5,8 +5,8 @@
 <title>Registro Aplicación Fertilizantes · {{ sucursal.sucursal }} · {{ semana.etiqueta_semana }}</title>
 <style>
   @page {
-    size: A4;
-    margin: 12mm 11mm 14mm 11mm;
+    size: A4 landscape;
+    margin: 10mm 11mm 12mm 11mm;
     @bottom-right {
       content: "Pág " counter(page) " / " counter(pages);
       font-family: Arial, Helvetica, sans-serif;
@@ -91,7 +91,7 @@
   /* ── Metadata de orden ──────────────────────────────────────── */
   .meta-bloque {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: 1fr 1fr 1fr;
     gap: 4mm;
     margin-bottom: 5mm;
   }
@@ -631,6 +631,32 @@
         <span class="label">Saco estándar</span>
         <span class="value">25 kg</span>
       </div>
+    </div>
+  </div>
+
+  <div class="meta-col">
+    <div class="meta-col-title">Resumen bodega</div>
+    <div class="meta-col-body">
+      {% if totales_campo %}
+      {% for t in totales_campo %}
+      <div class="meta-row">
+        <span class="label" style="min-width:0;flex:1;text-transform:none;letter-spacing:0;">{{ t.nombre }}</span>
+        <span class="value" style="text-align:right;flex:0 0 auto;font-variant-numeric:tabular-nums;">
+          <strong>{{ t.kg_fmt }} kg</strong>
+          <span style="color:#7a5c00;background:#fff8e1;padding:0 1.5mm;margin-left:1.5mm;border-radius:2px;font-weight:700;font-size:7.5pt;">{{ t.sacos }} sacos</span>
+        </span>
+      </div>
+      {% endfor %}
+      <div class="meta-row" style="border-top:2px solid #4a7c3f;margin-top:1mm;padding-top:1.5mm;">
+        <span class="label" style="min-width:0;flex:1;color:#1a3a10;">TOTAL</span>
+        <span class="value" style="text-align:right;flex:0 0 auto;color:#1a3a10;font-weight:800;">
+          {{ total_kg_campo_fmt }} kg
+          <span style="color:#fff;background:#d4920e;padding:0 1.5mm;margin-left:1.5mm;border-radius:2px;font-size:7.5pt;">{{ total_sacos_campo }} sacos</span>
+        </span>
+      </div>
+      {% else %}
+      <div class="meta-row"><span class="value" style="font-style:italic;color:#888;">Sin productos cargados.</span></div>
+      {% endif %}
     </div>
   </div>
 </div>
