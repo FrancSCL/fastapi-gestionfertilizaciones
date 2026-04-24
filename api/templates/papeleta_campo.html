@@ -701,18 +701,18 @@
 {% for cas in casetas %}
 <section class="caseta">
   <div class="caseta-title">
-    <span>Caseta {{ cas.nombre }}</span>
+    <span>{{ cas.nombre }}</span>
     <span class="sub">{{ cas.total_kg_fmt }} kg totales</span>
   </div>
 
   {% for eq in cas.equipos %}
   <div class="equipo">
-    <div class="equipo-title">Equipo {{ eq.nombre }}</div>
+    <div class="equipo-title">{{ eq.nombre }}</div>
 
     {% for sec in eq.sectores %}
     <article class="sector">
       <header class="sector-head">
-        <span>Sector {{ sec.nombre }}</span>
+        <span>{{ sec.nombre }}</span>
         <span class="sub">{{ sec.n_cuarteles }} cuartel{{ 'es' if sec.n_cuarteles != 1 else '' }} · {{ sec.sup_fmt }} ha</span>
       </header>
 
