@@ -787,6 +787,7 @@ def get_sectores_multiples(ids_cuartel: list) -> list:
 def get_papeleta_campo_rows(etiqueta_semana: str, id_sucursal: int) -> list:
     """Trae todos los registros planos para armar la papeleta jerarquica por campo.
     Una fila = (caseta, equipo, sector, cuartel con sup del sector, producto con dosis).
+    Incluye N-P-K del producto y especie del cuartel para cumplir formato auditoria.
     """
     sql = """
         SELECT
@@ -799,11 +800,17 @@ def get_papeleta_campo_rows(etiqueta_semana: str, id_sucursal: int) -> list:
             ceco.id               AS id_cuartel,
             ceco.descripcion_ceco AS cuartel,
             COALESCE(var.variedad, '—') AS variedad,
+            COALESCE(esp.especie, '—')  AS especie,
             prog.etapa,
+            prog.fecha_inicio,
+            prog.fecha_termino,
             psc.superficie        AS sup_sector_cuartel,
             prod.id               AS id_producto,
             prod.nombre_comercial AS producto,
-            pp.cantidad_producto  AS dosis_ha
+            pp.cantidad_producto  AS dosis_ha,
+            COALESCE(pn.n, 0)     AS pct_n,
+            COALESCE(pn.p, 0)     AS pct_p,
+            COALESCE(pn.k, 0)     AS pct_k
         FROM DIM_AREATECNICA_RIEGO_CASETA cas
         JOIN DIM_AREATECNICA_RIEGO_EQUIPO eq ON eq.id_caseta = cas.id
         JOIN DIM_AREATECNICA_RIEGO_SECTOR s  ON s.id_equipo  = eq.id
@@ -812,8 +819,10 @@ def get_papeleta_campo_rows(etiqueta_semana: str, id_sucursal: int) -> list:
         JOIN DIM_GENERAL_SEMANASTEMPORADA sem ON sem.id = prog.semana
         JOIN DIM_GENERAL_CECO ceco ON ceco.id = prog.id_cuartel
         LEFT JOIN DIM_GENERAL_VARIEDAD var ON var.id = ceco.id_variedad
+        LEFT JOIN DIM_GENERAL_ESPECIE  esp ON esp.id = var.id_especie
         JOIN FACT_AREATECNICA_FERTILIZACION_PRODUCTOSPROGRAMA pp ON pp.id_fertilizacion = prog.id
         JOIN DIM_AREATECNICA_FITO_PRODUCTO prod ON prod.id = pp.id_producto
+        LEFT JOIN DIM_AREATECNICA_FITO_PRODUCTONUTRIENTES pn ON pn.id_producto = prod.id
         WHERE cas.id_sucursal = %s
           AND sem.etiqueta_semana = %s
         ORDER BY cas.caseta, eq.equipo, s.nombre, ceco.descripcion_ceco, prod.nombre_comercial

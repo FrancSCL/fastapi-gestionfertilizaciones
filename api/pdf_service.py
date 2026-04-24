@@ -255,6 +255,11 @@ def build_pdf_campo(
     # Estructura anidada: casetas[].equipos[].sectores[].cuarteles[].productos[]
     casetas = OrderedDict()
     totales_campo: dict = {}
+    productos_campo: dict = {}  # agregado para tabla cabecera del PDF
+    especies_set = set()
+    etapas_set = set()
+    fecha_ini_min = None
+    fecha_term_max = None
 
     for r in rows:
         kc = (r["id_caseta"], r["caseta"])
@@ -280,6 +285,7 @@ def build_pdf_campo(
         cuartel = sector["cuarteles"].setdefault(kcu, {
             "nombre": r["cuartel"],
             "variedad": r["variedad"],
+            "especie": r.get("especie") or "—",
             "etapa": r["etapa"] or "—",
             "sup_sector": float(r["sup_sector_cuartel"] or 0),
             "productos": [],
@@ -290,8 +296,14 @@ def build_pdf_campo(
         kg = dosis * sup
         sacos = math.ceil(kg / PESO_ENVASE_KG) if kg > 0 else 0
 
+        pct_n = round(float(r.get("pct_n") or 0) * 100)
+        pct_p = round(float(r.get("pct_p") or 0) * 100)
+        pct_k = round(float(r.get("pct_k") or 0) * 100)
+        npk = f"{pct_n}-{pct_p}-{pct_k}"
+
         cuartel["productos"].append({
             "nombre": r["producto"],
+            "npk": npk,
             "dosis_fmt": _fmt(dosis, 1),
             "kg_fmt": _fmt(kg, 1),
             "sacos": sacos,
@@ -301,6 +313,26 @@ def build_pdf_campo(
         _agg(sector["totales"], r["producto"], kg)
         _agg(totales_campo, r["producto"], kg)
         caseta["total_kg"] += kg
+
+        # Productos agregados a cabecera con NPK (primera vez por producto)
+        if r["producto"] not in productos_campo:
+            productos_campo[r["producto"]] = {
+                "nombre": r["producto"],
+                "npk": npk,
+                "kg_total": 0.0,
+            }
+        productos_campo[r["producto"]]["kg_total"] += kg
+
+        if r.get("especie"):
+            especies_set.add(r["especie"])
+        if r.get("etapa"):
+            etapas_set.add(r["etapa"])
+        fi = r.get("fecha_inicio")
+        ft = r.get("fecha_termino")
+        if fi and (fecha_ini_min is None or fi < fecha_ini_min):
+            fecha_ini_min = fi
+        if ft and (fecha_term_max is None or ft > fecha_term_max):
+            fecha_term_max = ft
 
     # Sumar superficie del sector (unica por sector, no repetir por producto)
     for _, cas in casetas.items():
@@ -379,14 +411,43 @@ def build_pdf_campo(
     if fi and ft:
         periodo = f"{fi.strftime('%d/%m/%Y')} – {ft.strftime('%d/%m/%Y')}"
 
+    # Rango real segun fechas de los programas (puede diferir del rango de la semana)
+    periodo_prog = ""
+    if fecha_ini_min and fecha_term_max:
+        periodo_prog = f"{fecha_ini_min.strftime('%d/%m/%Y')} – {fecha_term_max.strftime('%d/%m/%Y')}"
+
+    # Numero de orden: SEM + ano + sucursal
+    etiqueta = semana.get("etiqueta_semana", "") if semana else ""
+    num_orden = f"{etiqueta} / {sucursal.get('sucursal', '')}" if sucursal else etiqueta
+
+    # Productos de cabecera con sacos calculados
+    productos_cabecera = []
+    for p in sorted(productos_campo.values(), key=lambda x: x["nombre"]):
+        kg = p["kg_total"]
+        productos_cabecera.append({
+            "nombre": p["nombre"],
+            "npk": p["npk"],
+            "kg_fmt": _fmt(kg, 1),
+            "sacos": math.ceil(kg / PESO_ENVASE_KG) if kg > 0 else 0,
+        })
+
+    # Especie / etapa resumidas
+    especies_txt = ", ".join(sorted(especies_set)) if especies_set else "—"
+    etapas_txt = ", ".join(sorted(etapas_set)) if etapas_set else "—"
+
     template = _env.get_template("papeleta_campo.html")
     html_str = template.render(
         sucursal=sucursal or {"sucursal": "—"},
         semana=semana or {},
         periodo=periodo,
+        periodo_prog=periodo_prog,
+        num_orden=num_orden,
         supervisor=supervisor or "",
         casetas=casetas_list,
         orfanos=orfanos_list,
+        productos_cabecera=productos_cabecera,
+        especies_txt=especies_txt,
+        etapas_txt=etapas_txt,
         totales_campo=totales_campo_list,
         total_kg_campo_fmt=_fmt(total_kg_campo, 1),
         total_sacos_campo=total_sacos_campo,

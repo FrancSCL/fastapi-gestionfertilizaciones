@@ -2,390 +2,668 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<title>Papeleta de Fertilización · {{ sucursal.sucursal }} · {{ semana.etiqueta_semana }}</title>
+<title>Registro Aplicación Fertilizantes · {{ sucursal.sucursal }} · {{ semana.etiqueta_semana }}</title>
 <style>
   @page {
     size: A4;
-    margin: 14mm 12mm 16mm 12mm;
+    margin: 12mm 11mm 14mm 11mm;
     @bottom-right {
       content: "Pág " counter(page) " / " counter(pages);
-      font-family: 'Helvetica Neue', sans-serif;
-      font-size: 8pt;
-      color: #6b7a67;
+      font-family: Arial, Helvetica, sans-serif;
+      font-size: 7.5pt;
+      color: #666;
     }
     @bottom-left {
-      content: "La Hornilla · Fertilizaciones · Emitido {{ fecha_emision }}";
-      font-family: 'Helvetica Neue', sans-serif;
-      font-size: 8pt;
-      color: #6b7a67;
+      content: "Emitido {{ fecha_emision }} · Sociedad Agrícola La Hornilla Ltda.";
+      font-family: Arial, Helvetica, sans-serif;
+      font-size: 7.5pt;
+      color: #666;
     }
-  }
-
-  :root {
-    --lh-900: #1f3320;
-    --lh-800: #2d4a2f;
-    --lh-700: #3d6540;
-    --lh-600: #4e7f52;
-    --lh-500: #609864;
-    --lh-200: #c5d8c7;
-    --lh-100: #e3ece4;
-    --lh-50:  #f3f7f3;
-    --ink: #1a2419;
-    --muted: #6b7a67;
-    --border: #d7e0d8;
-    --warn-bg: #fef3c7;
-    --warn-border: #d97706;
-    --warn-ink: #78350f;
   }
 
   * { box-sizing: border-box; }
   html, body {
-    font-family: 'Helvetica Neue', 'Arial', sans-serif;
-    font-size: 9.5pt;
-    color: var(--ink);
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 9pt;
+    color: #2c2c2c;
+    background: #fff;
     margin: 0;
     padding: 0;
   }
 
-  /* ── Encabezado ─────────────────────────────────────────────── */
-  .doc-head {
-    border-bottom: 2px solid var(--lh-800);
-    padding-bottom: 6mm;
+  /* ── Encabezado formal ──────────────────────────────────────── */
+  .doc-header {
+    border-bottom: 3px solid #4a7c3f;
+    padding-bottom: 4mm;
+    margin-bottom: 4mm;
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 6mm;
+    align-items: flex-end;
+  }
+  .doc-empresa {
+    font-size: 11pt;
+    font-weight: 800;
+    color: #2d5a1f;
+    letter-spacing: 0.3px;
+    margin: 0;
+  }
+  .doc-fundo {
+    font-size: 13pt;
+    font-weight: 800;
+    color: #1a3a10;
+    margin: 1mm 0 0;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+  }
+  .doc-subtitle {
+    font-size: 8.5pt;
+    color: #444;
+    margin: 1.5mm 0 0;
+    letter-spacing: 1px;
+    font-weight: 600;
+    text-transform: uppercase;
+  }
+  .doc-orden {
+    background: #f4faf1;
+    border: 1px solid #c5d9bb;
+    border-radius: 3px;
+    padding: 3mm 4mm;
+    font-size: 8.5pt;
+    color: #2d5a1f;
+    text-align: right;
+  }
+  .doc-orden .label {
+    font-size: 7pt;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    font-weight: 700;
+    color: #4a7c3f;
+    margin-bottom: 0.5mm;
+    display: block;
+  }
+  .doc-orden .value {
+    font-size: 10.5pt;
+    font-weight: 800;
+    color: #1a3a10;
+  }
+
+  /* ── Metadata de orden ──────────────────────────────────────── */
+  .meta-bloque {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 4mm;
     margin-bottom: 5mm;
   }
-  .doc-head-top {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    gap: 10mm;
+  .meta-col {
+    border: 1px solid #c5d9bb;
+    border-radius: 3px;
+    overflow: hidden;
   }
-  .doc-title {
-    font-size: 10pt;
-    color: var(--muted);
-    letter-spacing: 0.15em;
-    text-transform: uppercase;
-    font-weight: 600;
-    margin: 0 0 1mm;
-  }
-  .doc-campo {
-    font-size: 22pt;
-    font-weight: 800;
-    color: var(--lh-900);
-    letter-spacing: -0.01em;
-    margin: 0;
-    line-height: 1;
-  }
-  .doc-meta {
-    text-align: right;
+  .meta-col-title {
+    background: #4a7c3f;
+    color: #fff;
+    padding: 2mm 3mm;
     font-size: 9pt;
-    line-height: 1.5;
-    color: var(--ink);
+    font-weight: 700;
+    letter-spacing: 0.8px;
+    text-transform: uppercase;
   }
-  .doc-meta strong {
-    color: var(--lh-900);
-    font-size: 11pt;
-    display: block;
-    letter-spacing: 0.02em;
+  .meta-col-body {
+    padding: 2.5mm 3mm;
+    background: #fff;
   }
-  .doc-meta .meta-label {
-    color: var(--muted);
+  .meta-row {
+    display: flex;
+    gap: 3mm;
+    padding: 1.2mm 0;
+    border-bottom: 1px dotted #ddd;
+    font-size: 8.5pt;
+  }
+  .meta-row:last-child { border-bottom: none; }
+  .meta-row .label {
+    font-weight: 700;
+    color: #2d5a1f;
     font-size: 7.5pt;
-    letter-spacing: 0.08em;
     text-transform: uppercase;
+    letter-spacing: 0.5px;
+    min-width: 38mm;
+  }
+  .meta-row .value { flex: 1; color: #2c2c2c; font-size: 8.5pt; }
+  .meta-row.input-row .value {
+    border-bottom: 1px solid #c5d9bb;
+    min-height: 4mm;
   }
 
-  .doc-sub {
-    display: flex;
-    gap: 6mm;
-    margin-top: 3mm;
-    font-size: 9pt;
+  /* ── Tabla productos (cabecera agregada) ────────────────────── */
+  .section-title {
+    background: #3d6e34;
+    color: #fff;
+    padding: 2mm 4mm;
+    font-size: 9.5pt;
+    font-weight: 800;
+    letter-spacing: 0.8px;
+    text-transform: uppercase;
+    margin: 5mm 0 0;
+    border: 1px solid #2e5528;
   }
-  .doc-sub-item { color: var(--muted); }
-  .doc-sub-item strong { color: var(--ink); font-weight: 600; }
 
-  /* ── Jerarquía ──────────────────────────────────────────────── */
+  .prod-head-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 8.5pt;
+    border: 1px solid #c5d9bb;
+    margin-bottom: 4mm;
+  }
+  .prod-head-table th,
+  .prod-head-table td {
+    padding: 1.8mm 2.5mm;
+    text-align: left;
+  }
+  .prod-head-table th {
+    background: #eef7e9;
+    color: #2d5a1f;
+    font-size: 7.5pt;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    border-bottom: 1px solid #c5d9bb;
+  }
+  .prod-head-table td { border-bottom: 1px solid #eef7e9; }
+  .prod-head-table tr:last-child td { border-bottom: none; }
+  .prod-head-table tr:nth-child(even) td { background: #f9fdf7; }
+  .prod-head-table .num {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+  .prod-head-table .prod-name { font-weight: 700; color: #2c2c2c; }
+  .prod-head-table .npk {
+    color: #2d5a1f;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    font-size: 8pt;
+  }
+  .prod-head-table .saco-col {
+    background: #fff8e1 !important;
+    color: #7a5c00;
+    font-weight: 800;
+  }
+  .prod-head-table th.saco-col {
+    background: #d4920e !important;
+    color: #fff;
+  }
+
+  /* ── Jerarquía caseta → equipo → sector → cuartel ───────────── */
   .caseta {
-    margin-bottom: 7mm;
+    margin-bottom: 5mm;
     page-break-inside: avoid;
   }
-  .caseta-head {
-    display: flex;
-    align-items: baseline;
-    justify-content: space-between;
-    background: var(--lh-800);
+  .caseta-title {
+    background: #2d5a1f;
     color: #fff;
-    padding: 2.5mm 4mm;
-    font-size: 11pt;
-    font-weight: 700;
-    letter-spacing: 0.02em;
+    padding: 2mm 4mm;
+    font-size: 9.5pt;
+    font-weight: 800;
+    letter-spacing: 0.6px;
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
   }
-  .caseta-head .total {
-    font-size: 9pt;
+  .caseta-title .sub {
+    font-size: 8pt;
     font-weight: 500;
     opacity: 0.85;
   }
 
   .equipo {
-    margin: 3mm 0 4mm;
-    padding-left: 3mm;
+    padding: 2mm 3mm 0;
+    margin-bottom: 3mm;
     page-break-inside: avoid;
   }
-  .equipo-head {
-    font-size: 9pt;
+  .equipo-title {
+    font-size: 8pt;
     font-weight: 700;
-    letter-spacing: 0.12em;
+    color: #3d6e34;
     text-transform: uppercase;
-    color: var(--lh-700);
+    letter-spacing: 1.2px;
     padding: 1.5mm 0;
-    margin-bottom: 1mm;
-    border-bottom: 1px solid var(--lh-300, #a8c2ac);
+    border-bottom: 1px solid #c5d9bb;
+    margin-bottom: 2mm;
   }
 
   .sector {
-    margin: 2.5mm 0 3.5mm;
-    background: #fff;
-    border: 1px solid var(--border);
+    border: 1px solid #c5d9bb;
     border-radius: 2px;
+    margin-bottom: 3mm;
+    background: #fff;
     page-break-inside: avoid;
   }
   .sector-head {
+    background: #eef7e9;
+    padding: 1.8mm 3mm;
     display: flex;
     justify-content: space-between;
-    align-items: baseline;
-    background: var(--lh-100);
-    padding: 2mm 3mm;
-    font-size: 9.5pt;
+    font-size: 9pt;
     font-weight: 700;
-    color: var(--lh-900);
+    color: #2d5a1f;
+    border-bottom: 1px solid #c5d9bb;
   }
-  .sector-head .sector-meta {
+  .sector-head .sub {
     font-weight: 500;
-    font-size: 8.5pt;
-    color: var(--lh-700);
+    font-size: 8pt;
+    color: #3d6e34;
   }
 
-  .sector-body { padding: 1.5mm 3mm 0; }
-
-  /* Cuarteles dentro del sector */
+  /* Cuartel */
   .cuartel {
-    padding: 1.5mm 0;
+    padding: 2mm 3mm;
   }
   .cuartel + .cuartel {
-    border-top: 1px dashed var(--border);
-    margin-top: 1mm;
-    padding-top: 2mm;
+    border-top: 1px dashed #c5d9bb;
+    margin-top: 2mm;
+    padding-top: 3mm;
   }
   .cuartel-head {
     display: flex;
     justify-content: space-between;
     align-items: baseline;
-    font-size: 9pt;
     margin-bottom: 1.5mm;
+    font-size: 8.5pt;
   }
   .cuartel-name {
-    font-weight: 700;
-    color: var(--ink);
+    font-weight: 800;
+    color: #1a3a10;
+    font-size: 9pt;
   }
-  .cuartel-meta {
-    font-size: 8pt;
-    color: var(--muted);
-  }
+  .cuartel-meta { font-size: 7.5pt; color: #4a7c3f; font-weight: 600; }
   .cuartel-etapa {
     display: inline-block;
-    padding: 0.3mm 1.5mm;
-    background: var(--lh-50);
-    border: 1px solid var(--lh-200);
-    color: var(--lh-700);
+    padding: 0.5mm 2mm;
+    background: #b8dca4;
+    color: #1a3a10;
     border-radius: 2px;
-    font-size: 7.5pt;
-    font-weight: 700;
-    letter-spacing: 0.08em;
+    font-size: 7pt;
+    font-weight: 800;
+    letter-spacing: 0.8px;
     text-transform: uppercase;
     margin-left: 2mm;
   }
 
   /* Tabla productos del cuartel */
-  .prod-table {
+  .cuartel-table {
     width: 100%;
     border-collapse: collapse;
-    font-size: 8.5pt;
+    font-size: 8pt;
+    border: 1px solid #c5d9bb;
   }
-  .prod-table th,
-  .prod-table td {
-    text-align: left;
-    padding: 1mm 2mm;
-  }
-  .prod-table th {
-    font-weight: 600;
-    font-size: 7.5pt;
-    letter-spacing: 0.06em;
+  .cuartel-table th {
+    background: #4a7c3f;
+    color: #fff;
+    padding: 1.2mm 2mm;
+    font-size: 7pt;
     text-transform: uppercase;
-    color: var(--muted);
-    border-bottom: 1px solid var(--border);
+    letter-spacing: 0.5px;
+    text-align: left;
+    font-weight: 700;
   }
-  .prod-table td { border-bottom: 1px solid var(--border); }
-  .prod-table tr:last-child td { border-bottom: none; }
-  .prod-table .num {
+  .cuartel-table td {
+    padding: 1.5mm 2mm;
+    border-top: 1px solid #eef7e9;
+  }
+  .cuartel-table tr:nth-child(even) td { background: #f9fdf7; }
+  .cuartel-table .num {
     text-align: right;
     font-variant-numeric: tabular-nums;
     white-space: nowrap;
   }
-  .prod-table .prod-name {
-    font-weight: 600;
-    color: var(--ink);
+  .cuartel-table .saco-col {
+    background: #fff8e1 !important;
+    color: #7a5c00;
+    font-weight: 800;
+    text-align: right;
   }
-  .prod-table .sacos {
+  .cuartel-table th.saco-col {
+    background: #d4920e !important;
+    color: #fff;
+  }
+  .cuartel-table .prod-name { font-weight: 700; color: #2c2c2c; }
+  .cuartel-table .npk { color: #2d5a1f; font-size: 7.5pt; font-weight: 600; }
+
+  /* Confirmación por cuartel */
+  .confirm-row {
+    margin-top: 2mm;
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 2mm;
+    font-size: 7.5pt;
+  }
+  .confirm-cell {
+    border: 1px solid #c5d9bb;
+    padding: 1.5mm 2mm;
+    background: #f9fdf7;
+  }
+  .confirm-label {
+    font-size: 6.5pt;
     font-weight: 700;
-    color: var(--lh-800);
+    color: #4a7c3f;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .confirm-input {
+    border-bottom: 1px solid #c5d9bb;
+    min-height: 5mm;
+    margin-top: 1mm;
   }
 
-  /* Totales del sector */
+  /* Totales por sector */
   .sector-totales {
-    margin: 2mm 0 0;
-    padding: 1.8mm 3mm;
-    background: var(--lh-50);
-    border-top: 1px solid var(--lh-200);
+    background: #eef7e9;
+    border-top: 1px solid #c5d9bb;
+    padding: 1.5mm 3mm;
+    font-size: 7.5pt;
     display: flex;
     flex-wrap: wrap;
-    gap: 4mm;
-    font-size: 8.5pt;
+    gap: 3mm;
   }
   .sector-totales-label {
-    font-size: 7.5pt;
-    font-weight: 700;
-    letter-spacing: 0.08em;
+    font-weight: 800;
+    color: #1a3a10;
     text-transform: uppercase;
-    color: var(--lh-700);
-    align-self: center;
+    letter-spacing: 0.5px;
+    font-size: 7pt;
   }
   .sector-totales-item {
     display: inline-flex;
+    gap: 1.2mm;
     align-items: baseline;
-    gap: 1.5mm;
   }
-  .sector-totales-item .prod {
-    color: var(--ink);
-    font-weight: 600;
-  }
+  .sector-totales-item .prod { color: #2c2c2c; font-weight: 700; }
   .sector-totales-item .kg {
-    color: var(--lh-800);
+    color: #1a3a10;
+    font-weight: 800;
     font-variant-numeric: tabular-nums;
-    font-weight: 700;
   }
   .sector-totales-item .sacos {
-    color: var(--muted);
-    font-size: 8pt;
+    color: #7a5c00;
+    background: #fff8e1;
+    padding: 0.3mm 1.5mm;
+    border-radius: 2px;
+    font-weight: 700;
+    font-size: 7pt;
   }
 
-  /* ── Huérfanos (sin sector asignado) ────────────────────────── */
+  /* Huérfanos */
   .orfanos {
-    margin-top: 6mm;
-    border: 1.5px solid var(--warn-border);
-    background: var(--warn-bg);
-    border-radius: 2px;
+    border: 2px solid #d4920e;
+    background: #fff8e1;
     padding: 3mm 4mm;
+    margin-top: 5mm;
     page-break-inside: avoid;
   }
-  .orfanos-head {
-    font-size: 10pt;
+  .orfanos-title {
+    font-size: 9.5pt;
     font-weight: 800;
-    color: var(--warn-ink);
-    letter-spacing: 0.03em;
+    color: #7a5c00;
+    text-transform: uppercase;
     margin-bottom: 1.5mm;
   }
   .orfanos-sub {
-    font-size: 8.5pt;
-    color: var(--warn-ink);
-    margin-bottom: 2.5mm;
+    font-size: 7.5pt;
+    color: #7a5c00;
     font-style: italic;
+    margin-bottom: 2.5mm;
   }
-  .orfanos .cuartel-head { color: var(--warn-ink); }
 
-  /* ── Totales del campo (final) ──────────────────────────────── */
+  /* Totales del campo */
   .totales-campo {
-    margin-top: 8mm;
-    border-top: 2px solid var(--lh-800);
-    padding-top: 4mm;
+    margin-top: 6mm;
+    border: 2px solid #4a7c3f;
     page-break-inside: avoid;
   }
-  .totales-campo-head {
-    display: flex;
-    justify-content: space-between;
-    align-items: baseline;
-    margin-bottom: 3mm;
-  }
   .totales-campo-title {
-    font-size: 11pt;
+    background: #2d5a1f;
+    color: #fff;
+    padding: 2mm 4mm;
+    font-size: 10pt;
     font-weight: 800;
-    color: var(--lh-900);
-    letter-spacing: 0.02em;
+    letter-spacing: 0.8px;
     text-transform: uppercase;
-  }
-  .totales-campo-sub {
-    font-size: 8.5pt;
-    color: var(--muted);
   }
   .totales-table {
     width: 100%;
     border-collapse: collapse;
-    font-size: 9.5pt;
+    font-size: 9pt;
   }
   .totales-table th,
   .totales-table td {
-    padding: 2mm 3mm;
+    padding: 1.8mm 3mm;
     text-align: left;
-    border-bottom: 1px solid var(--border);
+    border-bottom: 1px solid #c5d9bb;
   }
   .totales-table th {
-    background: var(--lh-100);
+    background: #eef7e9;
+    color: #2d5a1f;
+    font-size: 7.5pt;
     font-weight: 700;
-    font-size: 8pt;
-    letter-spacing: 0.06em;
     text-transform: uppercase;
-    color: var(--lh-900);
+    letter-spacing: 0.5px;
   }
   .totales-table .num {
     text-align: right;
     font-variant-numeric: tabular-nums;
   }
-  .totales-table tfoot td {
+  .totales-table .saco-col {
+    background: #fff8e1 !important;
+    color: #7a5c00;
     font-weight: 800;
-    background: var(--lh-50);
-    color: var(--lh-900);
-    border-top: 2px solid var(--lh-500);
+  }
+  .totales-table th.saco-col {
+    background: #d4920e !important;
+    color: #fff;
+  }
+  .totales-table tfoot td {
+    background: #b8dca4;
+    color: #1a3a10;
+    font-weight: 800;
+    border-top: 2px solid #4a7c3f;
     border-bottom: none;
+  }
+  .totales-table tfoot td.saco-col {
+    background: #d4920e !important;
+    color: #fff;
+  }
+
+  /* ── Pie: EPP, observaciones, firmas ────────────────────────── */
+  .pie {
+    margin-top: 8mm;
+    page-break-inside: avoid;
+  }
+  .pie-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 4mm;
+    margin-bottom: 5mm;
+  }
+  .pie-box {
+    border: 1px solid #c5d9bb;
+    border-radius: 3px;
+    overflow: hidden;
+  }
+  .pie-box-title {
+    background: #3d6e34;
+    color: #fff;
+    padding: 1.8mm 3mm;
+    font-size: 8.5pt;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+  }
+  .pie-box-body { padding: 3mm; background: #fff; font-size: 8pt; }
+
+  .epp-list { display: grid; grid-template-columns: 1fr 1fr; gap: 2mm 4mm; }
+  .epp-item { display: flex; align-items: center; gap: 2mm; }
+  .check-box {
+    width: 3mm;
+    height: 3mm;
+    border: 1.2px solid #4a7c3f;
+    display: inline-block;
+    flex-shrink: 0;
+  }
+
+  .obs-area {
+    border: 1px solid #c5d9bb;
+    min-height: 18mm;
+    background: #f9fdf7;
+    padding: 2mm;
+    font-size: 7.5pt;
+    color: #aaa;
+    font-style: italic;
+  }
+
+  .firmas {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 4mm;
+    margin-top: 5mm;
+  }
+  .firma {
+    text-align: center;
+    padding-top: 12mm;
+    border-top: 1px solid #2d5a1f;
+  }
+  .firma-label {
+    font-size: 7pt;
+    font-weight: 800;
+    color: #2d5a1f;
+    letter-spacing: 0.8px;
+    text-transform: uppercase;
+  }
+  .firma-name {
+    font-size: 8.5pt;
+    color: #1a3a10;
+    font-weight: 700;
+    margin-top: 1mm;
+    min-height: 5mm;
   }
 
   .empty {
-    padding: 8mm;
+    padding: 10mm;
     text-align: center;
     font-style: italic;
-    color: var(--muted);
-    border: 1.5px dashed var(--border);
-    border-radius: 2px;
+    color: #888;
+    border: 1.5px dashed #c5d9bb;
+    border-radius: 3px;
   }
 </style>
 </head>
 <body>
 
-<header class="doc-head">
-  <div class="doc-head-top">
-    <div>
-      <p class="doc-title">Papeleta Semanal de Fertilización</p>
-      <h1 class="doc-campo">{{ sucursal.sucursal }}</h1>
-    </div>
-    <div class="doc-meta">
-      <span class="meta-label">Semana</span>
-      <strong>{{ semana.etiqueta_semana or '—' }}</strong>
-      {% if periodo %}<div>{{ periodo }}</div>{% endif %}
-      {% if semana.temporada %}<div class="meta-label" style="margin-top:2mm;">Temp {{ semana.temporada }}</div>{% endif %}
-    </div>
+<!-- Encabezado formal auditoría -->
+<header class="doc-header">
+  <div>
+    <p class="doc-empresa">SOCIEDAD AGRÍCOLA LA HORNILLA LTDA.</p>
+    <h1 class="doc-fundo">Fundo {{ sucursal.sucursal }}</h1>
+    <p class="doc-subtitle">Registro de Aplicaciones · Fertilizantes al Suelo</p>
   </div>
-  <div class="doc-sub">
-    {% if supervisor %}<span class="doc-sub-item"><span class="meta-label">Supervisor</span> <strong>{{ supervisor }}</strong></span>{% endif %}
-    <span class="doc-sub-item"><span class="meta-label">Saco</span> <strong>25 kg</strong></span>
+  <div class="doc-orden">
+    <span class="label">Orden N°</span>
+    <span class="value">{{ num_orden }}</span>
   </div>
 </header>
+
+<!-- Metadata: Orden / Confirmación -->
+<div class="meta-bloque">
+  <div class="meta-col">
+    <div class="meta-col-title">Orden de aplicación</div>
+    <div class="meta-col-body">
+      <div class="meta-row">
+        <span class="label">Fecha inicio</span>
+        <span class="value">{{ periodo_prog or periodo or '—' }}</span>
+      </div>
+      <div class="meta-row">
+        <span class="label">Semana</span>
+        <span class="value">{{ semana.etiqueta_semana or '—' }}{% if semana.temporada %} · Temp {{ semana.temporada }}{% endif %}</span>
+      </div>
+      <div class="meta-row">
+        <span class="label">Estado fenológico</span>
+        <span class="value">{{ etapas_txt }}</span>
+      </div>
+      <div class="meta-row">
+        <span class="label">Especie</span>
+        <span class="value">{{ especies_txt }}</span>
+      </div>
+      <div class="meta-row">
+        <span class="label">Método aplicación</span>
+        <span class="value">Vía riego</span>
+      </div>
+      <div class="meta-row">
+        <span class="label">Objetivo</span>
+        <span class="value">Abono</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="meta-col">
+    <div class="meta-col-title">Confirmación de aplicación</div>
+    <div class="meta-col-body">
+      <div class="meta-row input-row">
+        <span class="label">Fecha inicio</span>
+        <span class="value"></span>
+      </div>
+      <div class="meta-row input-row">
+        <span class="label">Fecha término</span>
+        <span class="value"></span>
+      </div>
+      <div class="meta-row input-row">
+        <span class="label">Hora inicio</span>
+        <span class="value"></span>
+      </div>
+      <div class="meta-row input-row">
+        <span class="label">Hora término</span>
+        <span class="value"></span>
+      </div>
+      <div class="meta-row input-row">
+        <span class="label">Responsable</span>
+        <span class="value">{{ supervisor }}</span>
+      </div>
+      <div class="meta-row input-row">
+        <span class="label">Saco estándar</span>
+        <span class="value">25 kg</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Tabla productos a aplicar (consolidado del campo) -->
+{% if productos_cabecera %}
+<h2 class="section-title">Producto a aplicar</h2>
+<table class="prod-head-table">
+  <thead>
+    <tr>
+      <th>Nombre comercial</th>
+      <th>N-P-K</th>
+      <th class="num">Kg totales</th>
+      <th class="num saco-col">Sacos 25 kg</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for p in productos_cabecera %}
+    <tr>
+      <td class="prod-name">{{ p.nombre }}</td>
+      <td class="npk">{{ p.npk }}</td>
+      <td class="num">{{ p.kg_fmt }}</td>
+      <td class="num saco-col">{{ p.sacos }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endif %}
+
+<!-- Detalle por cuartel organizado por jerarquia de riego -->
+{% if casetas or orfanos %}
+<h2 class="section-title">Detalle aplicación · Caseta → Equipo → Sector</h2>
+{% endif %}
 
 {% if not casetas and not orfanos %}
 <div class="empty">
@@ -395,59 +673,71 @@
 
 {% for cas in casetas %}
 <section class="caseta">
-  <div class="caseta-head">
+  <div class="caseta-title">
     <span>Caseta {{ cas.nombre }}</span>
-    <span class="total">{{ cas.total_kg_fmt }} kg totales</span>
+    <span class="sub">{{ cas.total_kg_fmt }} kg totales</span>
   </div>
 
   {% for eq in cas.equipos %}
   <div class="equipo">
-    <div class="equipo-head">Equipo {{ eq.nombre }}</div>
+    <div class="equipo-title">Equipo {{ eq.nombre }}</div>
 
     {% for sec in eq.sectores %}
     <article class="sector">
       <header class="sector-head">
         <span>Sector {{ sec.nombre }}</span>
-        <span class="sector-meta">
-          {{ sec.n_cuarteles }} cuartel{{ 'es' if sec.n_cuarteles != 1 else '' }} ·
-          {{ sec.sup_fmt }} ha
-        </span>
+        <span class="sub">{{ sec.n_cuarteles }} cuartel{{ 'es' if sec.n_cuarteles != 1 else '' }} · {{ sec.sup_fmt }} ha</span>
       </header>
 
-      <div class="sector-body">
-        {% for cu in sec.cuarteles %}
-        <div class="cuartel">
-          <div class="cuartel-head">
-            <span>
-              <span class="cuartel-name">{{ cu.nombre }}</span>
-              <span class="cuartel-meta">· {{ cu.variedad }} · {{ cu.sup_sector_fmt }} ha de este sector</span>
-              <span class="cuartel-etapa">{{ cu.etapa }}</span>
-            </span>
-          </div>
-
-          <table class="prod-table">
-            <thead>
-              <tr>
-                <th>Producto</th>
-                <th class="num">Dosis kg/ha</th>
-                <th class="num">Kg aplicar</th>
-                <th class="num">Sacos 25kg</th>
-              </tr>
-            </thead>
-            <tbody>
-              {% for p in cu.productos %}
-              <tr>
-                <td class="prod-name">{{ p.nombre }}</td>
-                <td class="num">{{ p.dosis_fmt }}</td>
-                <td class="num">{{ p.kg_fmt }}</td>
-                <td class="num sacos">{{ p.sacos }}</td>
-              </tr>
-              {% endfor %}
-            </tbody>
-          </table>
+      {% for cu in sec.cuarteles %}
+      <div class="cuartel">
+        <div class="cuartel-head">
+          <span>
+            <span class="cuartel-name">{{ cu.nombre }}</span>
+            <span class="cuartel-meta">{{ cu.variedad }} · {{ cu.sup_sector_fmt }} ha</span>
+            <span class="cuartel-etapa">{{ cu.etapa }}</span>
+          </span>
         </div>
-        {% endfor %}
+
+        <table class="cuartel-table">
+          <thead>
+            <tr>
+              <th>Producto</th>
+              <th>N-P-K</th>
+              <th class="num">Dosis kg/ha</th>
+              <th class="num">Kg aplicar</th>
+              <th class="num saco-col">Sacos</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for p in cu.productos %}
+            <tr>
+              <td class="prod-name">{{ p.nombre }}</td>
+              <td class="npk">{{ p.npk }}</td>
+              <td class="num">{{ p.dosis_fmt }}</td>
+              <td class="num">{{ p.kg_fmt }}</td>
+              <td class="num saco-col">{{ p.sacos }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+
+        <div class="confirm-row">
+          <div class="confirm-cell">
+            <div class="confirm-label">Fecha inicio</div>
+            <div class="confirm-input"></div>
+          </div>
+          <div class="confirm-cell">
+            <div class="confirm-label">Fecha término</div>
+            <div class="confirm-input"></div>
+          </div>
+          <div class="confirm-cell">
+            <div class="confirm-label">Observaciones</div>
+            <div class="confirm-input"></div>
+          </div>
+        </div>
       </div>
+      {% endfor %}
 
       {% if sec.totales and sec.n_cuarteles > 1 %}
       <div class="sector-totales">
@@ -456,7 +746,7 @@
         <span class="sector-totales-item">
           <span class="prod">{{ t.nombre }}</span>
           <span class="kg">{{ t.kg_fmt }} kg</span>
-          <span class="sacos">({{ t.sacos }} sacos)</span>
+          <span class="sacos">{{ t.sacos }} sacos</span>
         </span>
         {% endfor %}
       </div>
@@ -470,26 +760,26 @@
 
 {% if orfanos %}
 <section class="orfanos">
-  <div class="orfanos-head">Cuarteles sin sector de riego asignado</div>
+  <div class="orfanos-title">Cuarteles sin sector de riego asignado</div>
   <p class="orfanos-sub">Los siguientes cuarteles tienen programa esta semana pero no están vinculados a ningún sector. Aplicar a toda la superficie productiva.</p>
 
   {% for cu in orfanos %}
-  <div class="cuartel">
+  <div class="cuartel" style="background:#fff;border:1px solid #e6c97a;margin-bottom:2mm;border-radius:2px;">
     <div class="cuartel-head">
       <span>
         <span class="cuartel-name">{{ cu.nombre }}</span>
-        <span class="cuartel-meta">· {{ cu.variedad }} · {{ cu.sup_fmt }} ha</span>
+        <span class="cuartel-meta">{{ cu.variedad }} · {{ cu.sup_fmt }} ha</span>
         <span class="cuartel-etapa">{{ cu.etapa }}</span>
       </span>
     </div>
     {% if cu.productos %}
-    <table class="prod-table">
+    <table class="cuartel-table">
       <thead>
         <tr>
           <th>Producto</th>
           <th class="num">Dosis kg/ha</th>
           <th class="num">Kg aplicar</th>
-          <th class="num">Sacos 25kg</th>
+          <th class="num saco-col">Sacos</th>
         </tr>
       </thead>
       <tbody>
@@ -498,7 +788,7 @@
           <td class="prod-name">{{ p.nombre }}</td>
           <td class="num">{{ p.dosis_fmt }}</td>
           <td class="num">{{ p.kg_fmt }}</td>
-          <td class="num sacos">{{ p.sacos }}</td>
+          <td class="num saco-col">{{ p.sacos }}</td>
         </tr>
         {% endfor %}
       </tbody>
@@ -509,19 +799,16 @@
 </section>
 {% endif %}
 
+<!-- Total bodega del campo -->
 {% if totales_campo %}
 <section class="totales-campo">
-  <div class="totales-campo-head">
-    <span class="totales-campo-title">Total bodega del campo</span>
-    <span class="totales-campo-sub">retiro consolidado para {{ sucursal.sucursal }}</span>
-  </div>
-
+  <div class="totales-campo-title">Total Bodega del Campo</div>
   <table class="totales-table">
     <thead>
       <tr>
         <th>Producto</th>
         <th class="num">Kg totales</th>
-        <th class="num">Sacos 25kg</th>
+        <th class="num saco-col">Sacos 25 kg</th>
       </tr>
     </thead>
     <tbody>
@@ -529,7 +816,7 @@
       <tr>
         <td>{{ t.nombre }}</td>
         <td class="num">{{ t.kg_fmt }}</td>
-        <td class="num">{{ t.sacos }}</td>
+        <td class="num saco-col">{{ t.sacos }}</td>
       </tr>
       {% endfor %}
     </tbody>
@@ -537,12 +824,58 @@
       <tr>
         <td>TOTAL</td>
         <td class="num">{{ total_kg_campo_fmt }} kg</td>
-        <td class="num">{{ total_sacos_campo }}</td>
+        <td class="num saco-col">{{ total_sacos_campo }}</td>
       </tr>
     </tfoot>
   </table>
 </section>
 {% endif %}
+
+<!-- Pie: EPP, observaciones, firmas -->
+<section class="pie">
+  <div class="pie-grid">
+    <div class="pie-box">
+      <div class="pie-box-title">Equipo de Protección Personal</div>
+      <div class="pie-box-body">
+        <div class="epp-list">
+          <label class="epp-item"><span class="check-box"></span> Traje de goma</label>
+          <label class="epp-item"><span class="check-box"></span> Antiparras</label>
+          <label class="epp-item"><span class="check-box"></span> Botas</label>
+          <label class="epp-item"><span class="check-box"></span> Guantes</label>
+          <label class="epp-item"><span class="check-box"></span> Mascarilla</label>
+          <label class="epp-item"><span class="check-box"></span> Casco</label>
+        </div>
+      </div>
+    </div>
+
+    <div class="pie-box">
+      <div class="pie-box-title">Precauciones especiales de manejo</div>
+      <div class="pie-box-body">
+        <div class="obs-area">Evitar aplicación cerca de cursos de agua. Respetar tercio del riego recomendado.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="pie-box">
+    <div class="pie-box-title">Observaciones generales de aplicación</div>
+    <div class="pie-box-body"><div class="obs-area"></div></div>
+  </div>
+
+  <div class="firmas">
+    <div class="firma">
+      <div class="firma-label">Recomienda</div>
+      <div class="firma-name">{{ supervisor or '&nbsp;' | safe }}</div>
+    </div>
+    <div class="firma">
+      <div class="firma-label">Nombre dosificador</div>
+      <div class="firma-name">&nbsp;</div>
+    </div>
+    <div class="firma">
+      <div class="firma-label">Nombre aplicador</div>
+      <div class="firma-name">&nbsp;</div>
+    </div>
+  </div>
+</section>
 
 </body>
 </html>
