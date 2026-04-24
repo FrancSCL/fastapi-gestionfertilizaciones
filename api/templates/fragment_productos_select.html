@@ -1,14 +1,76 @@
 <div class="add-producto-form">
-  <form method="post" action="/app/matriz/{{ id_cuartel }}/agregar-producto">
+  <form method="post" action="/app/matriz/{{ id_cuartel }}/agregar-producto" id="addProdForm">
     {% if temporada %}<input type="hidden" name="temporada" value="{{ temporada }}">{% endif %}
-    <select class="filter-select" name="id_producto" required style="min-width:240px;">
-      <option value="">— Seleccionar producto —</option>
+
+    <div class="add-prod-head">
+      <div class="add-prod-search-wrap">
+        <svg class="add-prod-search-icon" viewBox="0 0 24 24" width="14" height="14" fill="none"
+             stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+        </svg>
+        <input type="text" id="addProdSearch" placeholder="Buscar producto o nutriente (N, NPK, K…)" autofocus>
+      </div>
+      <span class="add-prod-counter">
+        <span id="addProdCount">0</span> seleccionado<span id="addProdPlural"></span>
+      </span>
+    </div>
+
+    <div class="add-prod-list" id="addProdList">
       {% for p in productos %}
-      <option value="{{ p.id }}">{{ p.nombre_comercial }}</option>
+      <label class="add-prod-item"
+             data-name="{{ p.nombre_comercial | lower }}"
+             data-sigla="{{ p.sigla_nut | lower }}">
+        <input type="checkbox" name="id_producto" value="{{ p.id }}" class="add-prod-check">
+        <span class="add-prod-name">{{ p.nombre_comercial }}</span>
+        {% if p.sigla_nut %}
+        <span class="add-prod-sigla">{{ p.sigla_nut }}</span>
+        {% endif %}
+      </label>
+      {% else %}
+      <div class="add-prod-empty">No hay productos disponibles para agregar.</div>
       {% endfor %}
-    </select>
-    <button type="submit" class="filter-btn">Agregar</button>
-    <button type="button" class="filter-btn filter-btn-ghost"
-            onclick="document.getElementById('add-prod-panel').innerHTML=''">Cancelar</button>
+    </div>
+
+    <div class="add-prod-actions">
+      <button type="submit" class="filter-btn" id="addProdSubmit" disabled>Agregar seleccionados</button>
+      <button type="button" class="filter-btn filter-btn-ghost"
+              onclick="document.getElementById('add-prod-panel').innerHTML=''">Cancelar</button>
+    </div>
   </form>
 </div>
+
+<script>
+  (function() {
+    const form = document.getElementById('addProdForm');
+    const search = document.getElementById('addProdSearch');
+    const list = document.getElementById('addProdList');
+    const counter = document.getElementById('addProdCount');
+    const plural = document.getElementById('addProdPlural');
+    const submit = document.getElementById('addProdSubmit');
+    if (!form) return;
+    const items = Array.from(list.querySelectorAll('.add-prod-item'));
+    const checks = () => items.map(it => it.querySelector('.add-prod-check'));
+
+    function refresh() {
+      const count = checks().filter(c => c.checked).length;
+      counter.textContent = count;
+      plural.textContent = count === 1 ? '' : 's';
+      submit.disabled = count === 0;
+    }
+
+    function filter() {
+      const q = search.value.trim().toLowerCase();
+      items.forEach(it => {
+        const n = it.dataset.name || '';
+        const s = it.dataset.sigla || '';
+        it.style.display = (!q || n.includes(q) || s.includes(q)) ? '' : 'none';
+      });
+    }
+
+    list.addEventListener('change', e => {
+      if (e.target.classList.contains('add-prod-check')) refresh();
+    });
+    search.addEventListener('input', filter);
+    refresh();
+  })();
+</script>

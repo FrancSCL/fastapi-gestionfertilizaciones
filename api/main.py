@@ -355,11 +355,12 @@ def productos_disponibles_fragment(request: Request, id_cuartel: int, temporada:
 @app.post("/app/matriz/{id_cuartel}/agregar-producto")
 def agregar_producto(
     id_cuartel: int,
-    id_producto: int = Form(...),
+    id_producto: list[int] = Form(...),
     temporada: int | None = Form(None),
 ):
     ids_prog = get_programas_cuartel(id_cuartel, temporada)
-    agregar_producto_semanas(ids_prog, id_producto)
+    for pid in id_producto:
+        agregar_producto_semanas(ids_prog, pid)
     url = f"/app/matriz/{id_cuartel}" + (f"?temporada={temporada}" if temporada else "")
     return RedirectResponse(url=url, status_code=303)
 

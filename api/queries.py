@@ -525,27 +525,49 @@ def get_programas_cuartel(id_cuartel: int, id_temporada: int | None = None) -> l
             return [r["id"] for r in cur.fetchall()]
 
 
+_SIGLA_ORDEN = [("n", "N"), ("p", "P"), ("k", "K"),
+                ("mg", "Mg"), ("b", "B"), ("ca", "Ca"),
+                ("zn", "Zn"), ("mn", "Mn")]
+
+
 def get_productos_disponibles(id_cuartel: int, id_temporada: int | None = None) -> list:
-    """Productos que NO están ya en ningún programa del cuartel para la temporada."""
+    """Productos NO asignados al cuartel + string de nutrientes principales."""
     ids_prog = get_programas_cuartel(id_cuartel, id_temporada)
     if not ids_prog:
         return []
     ph = ",".join(["%s"] * len(ids_prog))
     sql = f"""
-        SELECT id, nombre_comercial
-        FROM DIM_AREATECNICA_FITO_PRODUCTO
-        WHERE id_actividad = 5
-          AND id NOT IN (
+        SELECT
+            p.id,
+            p.nombre_comercial,
+            COALESCE(pn.n, 0)  AS n,
+            COALESCE(pn.p, 0)  AS p,
+            COALESCE(pn.k, 0)  AS k,
+            COALESCE(pn.mg, 0) AS mg,
+            COALESCE(pn.b, 0)  AS b,
+            COALESCE(pn.ca, 0) AS ca,
+            COALESCE(pn.zn, 0) AS zn,
+            COALESCE(pn.mn, 0) AS mn
+        FROM DIM_AREATECNICA_FITO_PRODUCTO p
+        LEFT JOIN DIM_AREATECNICA_FITO_PRODUCTONUTRIENTES pn ON pn.id_producto = p.id
+        WHERE p.id_actividad = 5
+          AND p.id NOT IN (
             SELECT DISTINCT id_producto
             FROM FACT_AREATECNICA_FERTILIZACION_PRODUCTOSPROGRAMA
             WHERE id_fertilizacion IN ({ph})
         )
-        ORDER BY nombre_comercial
+        ORDER BY p.nombre_comercial
     """
     with get_connection() as conn:
         with conn.cursor() as cur:
             cur.execute(sql, ids_prog)
-            return cur.fetchall()
+            rows = cur.fetchall()
+
+    # Agregar string compacto de nutrientes por producto
+    for r in rows:
+        siglas = [sigla for col, sigla in _SIGLA_ORDEN if float(r.get(col) or 0) > 0]
+        r["sigla_nut"] = "".join(siglas) if siglas else ""
+    return rows
 
 
 def agregar_producto_semanas(ids_programa: list, id_producto: int) -> None:

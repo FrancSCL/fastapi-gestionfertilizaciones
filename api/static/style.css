@@ -1049,13 +1049,144 @@ h4 { font-size: 0.875rem; text-transform: uppercase; letter-spacing: 0.04em; col
 }
 
 .add-producto-form {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-3);
-  padding: var(--sp-3) var(--sp-4);
+  padding: var(--sp-4);
   background: var(--lh-50);
   border: 1px solid var(--lh-200);
   border-radius: 8px;
+}
+
+.add-producto-form form { display: block; }
+
+.add-prod-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  margin-bottom: var(--sp-3);
+}
+
+.add-prod-search-wrap {
+  position: relative;
+  flex: 1;
+  display: flex;
+  align-items: center;
+}
+
+.add-prod-search-icon {
+  position: absolute;
+  left: 12px;
+  color: var(--lh-600);
+  pointer-events: none;
+}
+
+.add-prod-search-wrap input {
+  flex: 1;
+  padding: 8px 12px 8px 34px;
+  background: white;
+  border: 1px solid var(--lh-200);
+  border-radius: 6px;
+  font-family: inherit;
+  font-size: 0.8125rem;
+  color: var(--text-primary);
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.add-prod-search-wrap input:focus {
+  outline: none;
+  border-color: var(--lh-500);
+  box-shadow: 0 0 0 3px oklch(0.52 0.12 145 / 0.12);
+}
+
+.add-prod-counter {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--lh-700);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.add-prod-list {
+  max-height: 320px;
+  overflow-y: auto;
+  background: white;
+  border: 1px solid var(--lh-200);
+  border-radius: 6px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  padding: 4px;
+  gap: 2px;
+  margin-bottom: var(--sp-3);
+}
+
+.add-prod-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background 0.1s;
+  font-size: 0.8125rem;
+}
+
+.add-prod-item:hover {
+  background: var(--lh-50);
+}
+
+.add-prod-item input {
+  accent-color: var(--lh-600);
+  flex-shrink: 0;
+  cursor: pointer;
+}
+
+.add-prod-item input:checked ~ .add-prod-name {
+  color: var(--lh-900);
+  font-weight: 700;
+}
+
+.add-prod-item:has(input:checked) {
+  background: var(--lh-100);
+}
+
+.add-prod-name {
+  flex: 1;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.add-prod-sigla {
+  display: inline-block;
+  padding: 1px 6px;
+  background: var(--lh-700);
+  color: white;
+  border-radius: 3px;
+  font-size: 0.6875rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  font-family: 'Anybody', system-ui, sans-serif;
+  flex-shrink: 0;
+}
+
+.add-prod-empty {
+  grid-column: 1 / -1;
+  padding: var(--sp-5);
+  text-align: center;
+  color: var(--text-muted);
+  font-style: italic;
+  font-size: 0.8125rem;
+}
+
+.add-prod-actions {
+  display: flex;
+  gap: var(--sp-2);
+  justify-content: flex-end;
+}
+
+.add-prod-actions button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .matriz-empty-cta {
@@ -1088,11 +1219,6 @@ h4 { font-size: 0.875rem; text-transform: uppercase; letter-spacing: 0.04em; col
   padding: 10px 20px;
 }
 
-.add-producto-form form {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-3);
-}
 
 /* ── Mobile overlay ───────────────────────────────────────────── */
 .sidebar-overlay {
