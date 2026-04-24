@@ -157,6 +157,7 @@ def get_productos_asignados(ids_programa: list) -> list:
             prod.nombre_comercial,
             uni.abreviatura         AS unidad,
             pp.cantidad_producto    AS dosis_ha,
+            COALESCE(prod.precio_usd, 0) AS precio_usd,
             COALESCE(nut.n,  0)     AS n_pct,
             COALESCE(nut.k,  0)     AS k_pct,
             COALESCE(nut.p,  0)     AS p_pct,
@@ -210,6 +211,7 @@ def build_matriz(semanas_rows: list, productos_rows: list) -> dict:
                 "id": p_id,
                 "nombre": r["nombre_comercial"],
                 "unidad": r["unidad"],
+                "precio_usd": float(r.get("precio_usd") or 0),
                 "pct": {nut: float(r[_NUT_COL[nut]] or 0) for nut in _NUTRIENTES},
             }
         celdas[(r["id_programa"], p_id)] = float(r["dosis_ha"]) if r["dosis_ha"] is not None else 0.0
@@ -252,11 +254,20 @@ def build_matriz(semanas_rows: list, productos_rows: list) -> dict:
     # totales aportados globales (suma across productos)
     totales_aporte = {nut: round(sum(unidades_por_nut.get(nut, [])), 2) for nut in _NUTRIENTES}
 
+    # costos USD por producto
+    costos_prod = []
+    for prod, total_kg in zip(productos_list, totales_prod):
+        precio = float(prod.get("precio_usd") or 0)
+        costos_prod.append(round(total_kg * precio, 2))
+    costo_ha_total = round(sum(costos_prod), 2)
+
     return {
         "semanas": semanas_list,
         "productos": productos_list,
         "filas": filas,
         "totales_prod": totales_prod,
+        "costos_prod": costos_prod,
+        "costo_ha_total": costo_ha_total,
         "unidades_por_nut": unidades_por_nut,
         "totales_aporte": totales_aporte,
     }

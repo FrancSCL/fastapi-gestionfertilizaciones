@@ -74,8 +74,12 @@
         {% set idx = loop.index0 %}
         {% set kg_ha = matriz.totales_prod[idx] %}
         {% set kg_sup = kg_ha * (cuartel.sup_productiva | float) %}
+        {% set precio = (prod.precio_usd or 0) | float %}
+        {% set usd_ha = kg_ha * precio %}
+        {% set usd_sup = kg_sup * precio %}
         <tbody class="prod-summary-group" data-prod-idx="{{ idx }}"
-               data-pct='{"N":{{ prod.pct.N }},"K":{{ prod.pct.K }},"P":{{ prod.pct.P }},"Mg":{{ prod.pct.Mg }},"B":{{ prod.pct.B }},"Ca":{{ prod.pct.Ca }},"Zn":{{ prod.pct.Zn }},"Mn":{{ prod.pct.Mn }}}'>
+               data-pct='{"N":{{ prod.pct.N }},"K":{{ prod.pct.K }},"P":{{ prod.pct.P }},"Mg":{{ prod.pct.Mg }},"B":{{ prod.pct.B }},"Ca":{{ prod.pct.Ca }},"Zn":{{ prod.pct.Zn }},"Mn":{{ prod.pct.Mn }}}'
+               data-precio="{{ precio }}">
           <tr class="prod-summary-name-row">
             <th colspan="2">{{ prod.nombre }}</th>
           </tr>
@@ -87,6 +91,16 @@
             <th>kg/sup</th>
             <td data-kg-sup>{{ '%.1f' | format(kg_sup) }}</td>
           </tr>
+          {% if precio > 0 %}
+          <tr class="prod-summary-usd-row">
+            <th>USD/ha</th>
+            <td data-usd-ha>{{ '%.2f' | format(usd_ha) }}</td>
+          </tr>
+          <tr class="prod-summary-usd-row">
+            <th>USD/sup</th>
+            <td data-usd-sup>{{ '%.2f' | format(usd_sup) }}</td>
+          </tr>
+          {% endif %}
           {% for nut in ['N','K','P','Mg','B','Ca','Zn','Mn'] %}
           {% if prod.pct[nut] > 0 %}
           {% set un = kg_ha * prod.pct[nut] %}
@@ -119,6 +133,16 @@
       <span class="cuartel-sup">
         <span class="sup-value">{{ '%.2f' | format(cuartel.sup_productiva | float) }}</span><span class="sup-unit">ha</span>
       </span>
+      {% if matriz.costo_ha_total and matriz.costo_ha_total > 0 %}
+      {% set usd_sup_total = matriz.costo_ha_total * (cuartel.sup_productiva | float) %}
+      <span class="cuartel-costo" data-costo-ha-total="{{ matriz.costo_ha_total }}">
+        <span class="costo-label">Costo/ha</span>
+        <span class="costo-val" data-costo-ha>{{ '%.2f' | format(matriz.costo_ha_total) }}</span><span class="costo-unit">USD</span>
+        <span class="costo-sep">·</span>
+        <span class="costo-label">Total sup.</span>
+        <span class="costo-val" data-costo-sup>{{ '%.2f' | format(usd_sup_total) }}</span><span class="costo-unit">USD</span>
+      </span>
+      {% endif %}
     </div>
 
     <!-- Panel agregar producto (HTMX lo llena) -->
@@ -273,17 +297,29 @@
 
     // Resumen lateral: tabla agrupada por producto + acumulado global por nutriente
     const nutSum = {N:0,K:0,P:0,Mg:0,B:0,Ca:0,Zn:0,Mn:0};
+    let costoHaTotal = 0;
 
     document.querySelectorAll('.prod-summary-group').forEach(grp => {
       const idx = parseInt(grp.dataset.prodIdx || '-1', 10);
       if (idx < 0 || idx >= n) return;
       const kgHa = totales[idx];
       const kgSup = kgHa * sup;
+      const precio = parseFloat(grp.dataset.precio || '0') || 0;
 
       const elHa = grp.querySelector('[data-kg-ha]');
       const elSup = grp.querySelector('[data-kg-sup]');
       if (elHa) elHa.textContent = kgHa.toFixed(1);
       if (elSup) elSup.textContent = kgSup.toFixed(1);
+
+      if (precio > 0) {
+        const usdHa = kgHa * precio;
+        const usdSup = kgSup * precio;
+        const elUsdHa = grp.querySelector('[data-usd-ha]');
+        const elUsdSup = grp.querySelector('[data-usd-sup]');
+        if (elUsdHa) elUsdHa.textContent = usdHa.toFixed(2);
+        if (elUsdSup) elUsdSup.textContent = usdSup.toFixed(2);
+        costoHaTotal += usdHa;
+      }
 
       let pct = {};
       try { pct = JSON.parse(grp.dataset.pct || '{}'); } catch (e) {}
@@ -317,6 +353,12 @@
         else tdSaldo.classList.add('is-ok');
       }
     });
+
+    // Costo total del cuartel en el header
+    const costoHaEl = document.querySelector('.cuartel-costo [data-costo-ha]');
+    const costoSupEl = document.querySelector('.cuartel-costo [data-costo-sup]');
+    if (costoHaEl) costoHaEl.textContent = costoHaTotal.toFixed(2);
+    if (costoSupEl) costoSupEl.textContent = (costoHaTotal * sup).toFixed(2);
   }
 
   document.addEventListener('change', e => {
