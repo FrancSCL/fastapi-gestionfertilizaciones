@@ -782,6 +782,98 @@ def get_sectores_multiples(ids_cuartel: list) -> list:
             return cur.fetchall()
 
 
+# ══ Papeleta por campo (caseta → equipo → sector → cuarteles) ═════════════════
+
+def get_papeleta_campo_rows(etiqueta_semana: str, id_sucursal: int) -> list:
+    """Trae todos los registros planos para armar la papeleta jerarquica por campo.
+    Una fila = (caseta, equipo, sector, cuartel con sup del sector, producto con dosis).
+    """
+    sql = """
+        SELECT
+            cas.id                AS id_caseta,
+            cas.caseta            AS caseta,
+            eq.id                 AS id_equipo,
+            eq.equipo             AS equipo,
+            s.id                  AS id_sector,
+            s.nombre              AS sector,
+            ceco.id               AS id_cuartel,
+            ceco.descripcion_ceco AS cuartel,
+            COALESCE(var.variedad, '—') AS variedad,
+            prog.etapa,
+            psc.superficie        AS sup_sector_cuartel,
+            prod.id               AS id_producto,
+            prod.nombre_comercial AS producto,
+            pp.cantidad_producto  AS dosis_ha
+        FROM DIM_AREATECNICA_RIEGO_CASETA cas
+        JOIN DIM_AREATECNICA_RIEGO_EQUIPO eq ON eq.id_caseta = cas.id
+        JOIN DIM_AREATECNICA_RIEGO_SECTOR s  ON s.id_equipo  = eq.id
+        JOIN PIVOT_AREATECNICA_RIEGO_SECTORCUARTEL psc ON psc.id_sector = s.id
+        JOIN FACT_AREATECNICA_FERTILIZACION_PROGRAMA prog ON prog.id_cuartel = psc.id_cuartel
+        JOIN DIM_GENERAL_SEMANASTEMPORADA sem ON sem.id = prog.semana
+        JOIN DIM_GENERAL_CECO ceco ON ceco.id = prog.id_cuartel
+        LEFT JOIN DIM_GENERAL_VARIEDAD var ON var.id = ceco.id_variedad
+        JOIN FACT_AREATECNICA_FERTILIZACION_PRODUCTOSPROGRAMA pp ON pp.id_fertilizacion = prog.id
+        JOIN DIM_AREATECNICA_FITO_PRODUCTO prod ON prod.id = pp.id_producto
+        WHERE cas.id_sucursal = %s
+          AND sem.etiqueta_semana = %s
+        ORDER BY cas.caseta, eq.equipo, s.nombre, ceco.descripcion_ceco, prod.nombre_comercial
+    """
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(sql, (id_sucursal, etiqueta_semana))
+            return cur.fetchall()
+
+
+def get_cuarteles_huerfanos(etiqueta_semana: str, id_sucursal: int) -> list:
+    """Cuarteles con programa en la semana pero sin sector de riego asignado.
+    Retorna una fila por (cuartel, producto)."""
+    sql = """
+        SELECT
+            ceco.id               AS id_cuartel,
+            ceco.descripcion_ceco AS cuartel,
+            COALESCE(var.variedad, '—') AS variedad,
+            ceco.sup_productiva,
+            prog.etapa,
+            prod.nombre_comercial AS producto,
+            pp.cantidad_producto  AS dosis_ha
+        FROM FACT_AREATECNICA_FERTILIZACION_PROGRAMA prog
+        JOIN DIM_GENERAL_CECO ceco ON ceco.id = prog.id_cuartel
+        JOIN DIM_GENERAL_SEMANASTEMPORADA sem ON sem.id = prog.semana
+        LEFT JOIN DIM_GENERAL_VARIEDAD var ON var.id = ceco.id_variedad
+        LEFT JOIN PIVOT_AREATECNICA_RIEGO_SECTORCUARTEL psc ON psc.id_cuartel = ceco.id
+        LEFT JOIN FACT_AREATECNICA_FERTILIZACION_PRODUCTOSPROGRAMA pp ON pp.id_fertilizacion = prog.id
+        LEFT JOIN DIM_AREATECNICA_FITO_PRODUCTO prod ON prod.id = pp.id_producto
+        WHERE ceco.id_sucursal = %s
+          AND sem.etiqueta_semana = %s
+          AND psc.id_sector IS NULL
+        ORDER BY ceco.descripcion_ceco, prod.nombre_comercial
+    """
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(sql, (id_sucursal, etiqueta_semana))
+            return cur.fetchall()
+
+
+def get_sucursal_info(id_sucursal: int) -> dict | None:
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT id, sucursal FROM DIM_GENERAL_SUCURSAL WHERE id = %s", (id_sucursal,))
+            return cur.fetchone()
+
+
+def get_semana_info(etiqueta_semana: str) -> dict | None:
+    sql = """
+        SELECT etiqueta_semana, semana_calendario, fecha_inicio, fecha_fin, temporada
+        FROM DIM_GENERAL_SEMANASTEMPORADA
+        WHERE etiqueta_semana = %s
+        LIMIT 1
+    """
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(sql, (etiqueta_semana,))
+            return cur.fetchone()
+
+
 # ══ AUTH ═══════════════════════════════════════════════════════════════════════
 
 def validar_login(usuario: str, contrasena: str) -> dict | None:

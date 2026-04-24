@@ -20,9 +20,10 @@ from .queries import (
     get_programas_cuartel, get_productos_disponibles,
     agregar_producto_semanas, update_dosis, eliminar_producto_cuartel,
     get_productos_lista, get_unidades_lista, save_producto, update_producto_nutrientes,
+    get_papeleta_campo_rows, get_cuarteles_huerfanos, get_sucursal_info, get_semana_info,
     validar_login,
 )
-from .pdf_service import build_pdf, build_pdf_bodega
+from .pdf_service import build_pdf, build_pdf_bodega, build_pdf_campo
 
 app = FastAPI(title="LH Fertilizaciones")
 
@@ -509,6 +510,39 @@ def generar_papeleta(id_programa: str):
         content=pdf_bytes,
         media_type="application/pdf",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+@app.get("/papeleta-campo/{etiqueta_semana}/{id_sucursal}")
+def generar_papeleta_campo(request: Request, etiqueta_semana: str, id_sucursal: int):
+    sucursal = get_sucursal_info(id_sucursal)
+    if not sucursal:
+        raise HTTPException(status_code=404, detail="Sucursal no encontrada")
+
+    semana = get_semana_info(etiqueta_semana)
+    if not semana:
+        raise HTTPException(status_code=404, detail=f"Semana '{etiqueta_semana}' no encontrada")
+
+    rows = get_papeleta_campo_rows(etiqueta_semana, id_sucursal)
+    orfanos = get_cuarteles_huerfanos(etiqueta_semana, id_sucursal)
+
+    supervisor = request.session.get("user_name", "") if hasattr(request, "session") else ""
+
+    pdf_bytes = build_pdf_campo(
+        rows=rows,
+        orfanos=orfanos,
+        sucursal=sucursal,
+        semana=semana,
+        supervisor=supervisor,
+    )
+
+    safe_suc = sucursal["sucursal"].replace(" ", "_")
+    safe_sem = etiqueta_semana.replace(" ", "_")
+    filename = f"papeleta_{safe_suc}_{safe_sem}.pdf"
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'inline; filename="{filename}"'},
     )
 
 

@@ -230,6 +230,171 @@ def _bodega_secciones(programas: list, productos_map: dict, sectores_map: dict, 
     return secciones, resumen_global
 
 
+def _agg(d: dict, key: str, kg: float) -> None:
+    e = d.setdefault(key, {"kg": 0.0, "sacos": 0})
+    e["kg"] += kg
+    e["sacos"] = math.ceil(e["kg"] / PESO_ENVASE_KG) if e["kg"] > 0 else 0
+
+
+def build_pdf_campo(
+    rows: list,
+    orfanos: list,
+    sucursal: dict,
+    semana: dict,
+    supervisor: str = "",
+) -> bytes:
+    """Papeleta semanal organizada por caseta → equipo → sector → cuartel.
+
+    rows:     filas planas de get_papeleta_campo_rows()
+    orfanos:  filas planas de get_cuarteles_huerfanos()
+    sucursal: {id, sucursal}
+    semana:   {etiqueta_semana, fecha_inicio, fecha_fin, temporada}
+    """
+    from collections import OrderedDict
+
+    # Estructura anidada: casetas[].equipos[].sectores[].cuarteles[].productos[]
+    casetas = OrderedDict()
+    totales_campo: dict = {}
+
+    for r in rows:
+        kc = (r["id_caseta"], r["caseta"])
+        ke = (r["id_equipo"], r["equipo"])
+        ks = (r["id_sector"], r["sector"])
+        kcu = (r["id_cuartel"], r["cuartel"], r["variedad"], r["etapa"] or "—")
+
+        caseta = casetas.setdefault(kc, {
+            "nombre": r["caseta"],
+            "equipos": OrderedDict(),
+            "total_kg": 0.0,
+        })
+        equipo = caseta["equipos"].setdefault(ke, {
+            "nombre": r["equipo"],
+            "sectores": OrderedDict(),
+        })
+        sector = equipo["sectores"].setdefault(ks, {
+            "nombre": r["sector"],
+            "cuarteles": OrderedDict(),
+            "sup_total": 0.0,
+            "totales": {},
+        })
+        cuartel = sector["cuarteles"].setdefault(kcu, {
+            "nombre": r["cuartel"],
+            "variedad": r["variedad"],
+            "etapa": r["etapa"] or "—",
+            "sup_sector": float(r["sup_sector_cuartel"] or 0),
+            "productos": [],
+        })
+
+        dosis = float(r["dosis_ha"] or 0)
+        sup = float(r["sup_sector_cuartel"] or 0)
+        kg = dosis * sup
+        sacos = math.ceil(kg / PESO_ENVASE_KG) if kg > 0 else 0
+
+        cuartel["productos"].append({
+            "nombre": r["producto"],
+            "dosis_fmt": _fmt(dosis, 1),
+            "kg_fmt": _fmt(kg, 1),
+            "sacos": sacos,
+            "kg": kg,
+        })
+
+        _agg(sector["totales"], r["producto"], kg)
+        _agg(totales_campo, r["producto"], kg)
+        caseta["total_kg"] += kg
+
+    # Sumar superficie del sector (unica por sector, no repetir por producto)
+    for _, cas in casetas.items():
+        for _, eq in cas["equipos"].items():
+            for _, sec in eq["sectores"].items():
+                sec["sup_total"] = sum(c["sup_sector"] for c in sec["cuarteles"].values())
+                # Formatear totales del sector
+                sec["totales_list"] = [
+                    {"nombre": k, "kg_fmt": _fmt(v["kg"], 1), "sacos": v["sacos"]}
+                    for k, v in sorted(sec["totales"].items())
+                ]
+
+    # Convertir OrderedDicts a listas para el template
+    casetas_list = []
+    for _, cas in casetas.items():
+        equipos_list = []
+        for _, eq in cas["equipos"].items():
+            sectores_list = []
+            for _, sec in eq["sectores"].items():
+                cuarteles_list = list(sec["cuarteles"].values())
+                for c in cuarteles_list:
+                    c["sup_sector_fmt"] = _fmt(c["sup_sector"], 2)
+                sectores_list.append({
+                    "nombre": sec["nombre"],
+                    "sup_fmt": _fmt(sec["sup_total"], 2),
+                    "n_cuarteles": len(cuarteles_list),
+                    "cuarteles": cuarteles_list,
+                    "totales": sec["totales_list"],
+                })
+            equipos_list.append({
+                "nombre": eq["nombre"],
+                "sectores": sectores_list,
+            })
+        casetas_list.append({
+            "nombre": cas["nombre"],
+            "equipos": equipos_list,
+            "total_kg_fmt": _fmt(cas["total_kg"], 1),
+        })
+
+    # Orfanos: agrupar por cuartel
+    orfanos_grouped = OrderedDict()
+    for r in orfanos:
+        k = (r["id_cuartel"], r["cuartel"], r["variedad"], r["etapa"] or "—", float(r["sup_productiva"] or 0))
+        bucket = orfanos_grouped.setdefault(k, {
+            "nombre": r["cuartel"],
+            "variedad": r["variedad"],
+            "etapa": r["etapa"] or "—",
+            "sup_fmt": _fmt(float(r["sup_productiva"] or 0), 2),
+            "sup": float(r["sup_productiva"] or 0),
+            "productos": [],
+        })
+        if r["producto"]:
+            dosis = float(r["dosis_ha"] or 0)
+            kg = dosis * bucket["sup"]
+            bucket["productos"].append({
+                "nombre": r["producto"],
+                "dosis_fmt": _fmt(dosis, 1),
+                "kg_fmt": _fmt(kg, 1),
+                "sacos": math.ceil(kg / PESO_ENVASE_KG) if kg > 0 else 0,
+            })
+            _agg(totales_campo, r["producto"], kg)
+    orfanos_list = list(orfanos_grouped.values())
+
+    # Totales del campo ordenados alfabeticamente
+    totales_campo_list = [
+        {"nombre": k, "kg_fmt": _fmt(v["kg"], 1), "sacos": v["sacos"]}
+        for k, v in sorted(totales_campo.items())
+    ]
+    total_kg_campo = sum(v["kg"] for v in totales_campo.values())
+    total_sacos_campo = sum(v["sacos"] for v in totales_campo.values())
+
+    # Periodo y numero de orden
+    fi = semana.get("fecha_inicio") if semana else None
+    ft = semana.get("fecha_fin") if semana else None
+    periodo = ""
+    if fi and ft:
+        periodo = f"{fi.strftime('%d/%m/%Y')} – {ft.strftime('%d/%m/%Y')}"
+
+    template = _env.get_template("papeleta_campo.html")
+    html_str = template.render(
+        sucursal=sucursal or {"sucursal": "—"},
+        semana=semana or {},
+        periodo=periodo,
+        supervisor=supervisor or "",
+        casetas=casetas_list,
+        orfanos=orfanos_list,
+        totales_campo=totales_campo_list,
+        total_kg_campo_fmt=_fmt(total_kg_campo, 1),
+        total_sacos_campo=total_sacos_campo,
+        fecha_emision=date.today().strftime("%d/%m/%Y"),
+    )
+    return HTML(string=html_str, base_url=str(TEMPLATES_DIR)).write_pdf()
+
+
 def build_pdf_bodega(etiqueta_semana: str, programas: list, productos_map: dict, sectores_map: dict, pro: bool = False) -> bytes:
     """
     Registro semanal para bodega.

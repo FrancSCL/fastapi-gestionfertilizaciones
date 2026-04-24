@@ -1,0 +1,548 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Papeleta de Fertilización · {{ sucursal.sucursal }} · {{ semana.etiqueta_semana }}</title>
+<style>
+  @page {
+    size: A4;
+    margin: 14mm 12mm 16mm 12mm;
+    @bottom-right {
+      content: "Pág " counter(page) " / " counter(pages);
+      font-family: 'Helvetica Neue', sans-serif;
+      font-size: 8pt;
+      color: #6b7a67;
+    }
+    @bottom-left {
+      content: "La Hornilla · Fertilizaciones · Emitido {{ fecha_emision }}";
+      font-family: 'Helvetica Neue', sans-serif;
+      font-size: 8pt;
+      color: #6b7a67;
+    }
+  }
+
+  :root {
+    --lh-900: #1f3320;
+    --lh-800: #2d4a2f;
+    --lh-700: #3d6540;
+    --lh-600: #4e7f52;
+    --lh-500: #609864;
+    --lh-200: #c5d8c7;
+    --lh-100: #e3ece4;
+    --lh-50:  #f3f7f3;
+    --ink: #1a2419;
+    --muted: #6b7a67;
+    --border: #d7e0d8;
+    --warn-bg: #fef3c7;
+    --warn-border: #d97706;
+    --warn-ink: #78350f;
+  }
+
+  * { box-sizing: border-box; }
+  html, body {
+    font-family: 'Helvetica Neue', 'Arial', sans-serif;
+    font-size: 9.5pt;
+    color: var(--ink);
+    margin: 0;
+    padding: 0;
+  }
+
+  /* ── Encabezado ─────────────────────────────────────────────── */
+  .doc-head {
+    border-bottom: 2px solid var(--lh-800);
+    padding-bottom: 6mm;
+    margin-bottom: 5mm;
+  }
+  .doc-head-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 10mm;
+  }
+  .doc-title {
+    font-size: 10pt;
+    color: var(--muted);
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    font-weight: 600;
+    margin: 0 0 1mm;
+  }
+  .doc-campo {
+    font-size: 22pt;
+    font-weight: 800;
+    color: var(--lh-900);
+    letter-spacing: -0.01em;
+    margin: 0;
+    line-height: 1;
+  }
+  .doc-meta {
+    text-align: right;
+    font-size: 9pt;
+    line-height: 1.5;
+    color: var(--ink);
+  }
+  .doc-meta strong {
+    color: var(--lh-900);
+    font-size: 11pt;
+    display: block;
+    letter-spacing: 0.02em;
+  }
+  .doc-meta .meta-label {
+    color: var(--muted);
+    font-size: 7.5pt;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .doc-sub {
+    display: flex;
+    gap: 6mm;
+    margin-top: 3mm;
+    font-size: 9pt;
+  }
+  .doc-sub-item { color: var(--muted); }
+  .doc-sub-item strong { color: var(--ink); font-weight: 600; }
+
+  /* ── Jerarquía ──────────────────────────────────────────────── */
+  .caseta {
+    margin-bottom: 7mm;
+    page-break-inside: avoid;
+  }
+  .caseta-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    background: var(--lh-800);
+    color: #fff;
+    padding: 2.5mm 4mm;
+    font-size: 11pt;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+  }
+  .caseta-head .total {
+    font-size: 9pt;
+    font-weight: 500;
+    opacity: 0.85;
+  }
+
+  .equipo {
+    margin: 3mm 0 4mm;
+    padding-left: 3mm;
+    page-break-inside: avoid;
+  }
+  .equipo-head {
+    font-size: 9pt;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--lh-700);
+    padding: 1.5mm 0;
+    margin-bottom: 1mm;
+    border-bottom: 1px solid var(--lh-300, #a8c2ac);
+  }
+
+  .sector {
+    margin: 2.5mm 0 3.5mm;
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    page-break-inside: avoid;
+  }
+  .sector-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    background: var(--lh-100);
+    padding: 2mm 3mm;
+    font-size: 9.5pt;
+    font-weight: 700;
+    color: var(--lh-900);
+  }
+  .sector-head .sector-meta {
+    font-weight: 500;
+    font-size: 8.5pt;
+    color: var(--lh-700);
+  }
+
+  .sector-body { padding: 1.5mm 3mm 0; }
+
+  /* Cuarteles dentro del sector */
+  .cuartel {
+    padding: 1.5mm 0;
+  }
+  .cuartel + .cuartel {
+    border-top: 1px dashed var(--border);
+    margin-top: 1mm;
+    padding-top: 2mm;
+  }
+  .cuartel-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    font-size: 9pt;
+    margin-bottom: 1.5mm;
+  }
+  .cuartel-name {
+    font-weight: 700;
+    color: var(--ink);
+  }
+  .cuartel-meta {
+    font-size: 8pt;
+    color: var(--muted);
+  }
+  .cuartel-etapa {
+    display: inline-block;
+    padding: 0.3mm 1.5mm;
+    background: var(--lh-50);
+    border: 1px solid var(--lh-200);
+    color: var(--lh-700);
+    border-radius: 2px;
+    font-size: 7.5pt;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin-left: 2mm;
+  }
+
+  /* Tabla productos del cuartel */
+  .prod-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 8.5pt;
+  }
+  .prod-table th,
+  .prod-table td {
+    text-align: left;
+    padding: 1mm 2mm;
+  }
+  .prod-table th {
+    font-weight: 600;
+    font-size: 7.5pt;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--muted);
+    border-bottom: 1px solid var(--border);
+  }
+  .prod-table td { border-bottom: 1px solid var(--border); }
+  .prod-table tr:last-child td { border-bottom: none; }
+  .prod-table .num {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+  .prod-table .prod-name {
+    font-weight: 600;
+    color: var(--ink);
+  }
+  .prod-table .sacos {
+    font-weight: 700;
+    color: var(--lh-800);
+  }
+
+  /* Totales del sector */
+  .sector-totales {
+    margin: 2mm 0 0;
+    padding: 1.8mm 3mm;
+    background: var(--lh-50);
+    border-top: 1px solid var(--lh-200);
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4mm;
+    font-size: 8.5pt;
+  }
+  .sector-totales-label {
+    font-size: 7.5pt;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--lh-700);
+    align-self: center;
+  }
+  .sector-totales-item {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 1.5mm;
+  }
+  .sector-totales-item .prod {
+    color: var(--ink);
+    font-weight: 600;
+  }
+  .sector-totales-item .kg {
+    color: var(--lh-800);
+    font-variant-numeric: tabular-nums;
+    font-weight: 700;
+  }
+  .sector-totales-item .sacos {
+    color: var(--muted);
+    font-size: 8pt;
+  }
+
+  /* ── Huérfanos (sin sector asignado) ────────────────────────── */
+  .orfanos {
+    margin-top: 6mm;
+    border: 1.5px solid var(--warn-border);
+    background: var(--warn-bg);
+    border-radius: 2px;
+    padding: 3mm 4mm;
+    page-break-inside: avoid;
+  }
+  .orfanos-head {
+    font-size: 10pt;
+    font-weight: 800;
+    color: var(--warn-ink);
+    letter-spacing: 0.03em;
+    margin-bottom: 1.5mm;
+  }
+  .orfanos-sub {
+    font-size: 8.5pt;
+    color: var(--warn-ink);
+    margin-bottom: 2.5mm;
+    font-style: italic;
+  }
+  .orfanos .cuartel-head { color: var(--warn-ink); }
+
+  /* ── Totales del campo (final) ──────────────────────────────── */
+  .totales-campo {
+    margin-top: 8mm;
+    border-top: 2px solid var(--lh-800);
+    padding-top: 4mm;
+    page-break-inside: avoid;
+  }
+  .totales-campo-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 3mm;
+  }
+  .totales-campo-title {
+    font-size: 11pt;
+    font-weight: 800;
+    color: var(--lh-900);
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+  }
+  .totales-campo-sub {
+    font-size: 8.5pt;
+    color: var(--muted);
+  }
+  .totales-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 9.5pt;
+  }
+  .totales-table th,
+  .totales-table td {
+    padding: 2mm 3mm;
+    text-align: left;
+    border-bottom: 1px solid var(--border);
+  }
+  .totales-table th {
+    background: var(--lh-100);
+    font-weight: 700;
+    font-size: 8pt;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--lh-900);
+  }
+  .totales-table .num {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+  .totales-table tfoot td {
+    font-weight: 800;
+    background: var(--lh-50);
+    color: var(--lh-900);
+    border-top: 2px solid var(--lh-500);
+    border-bottom: none;
+  }
+
+  .empty {
+    padding: 8mm;
+    text-align: center;
+    font-style: italic;
+    color: var(--muted);
+    border: 1.5px dashed var(--border);
+    border-radius: 2px;
+  }
+</style>
+</head>
+<body>
+
+<header class="doc-head">
+  <div class="doc-head-top">
+    <div>
+      <p class="doc-title">Papeleta Semanal de Fertilización</p>
+      <h1 class="doc-campo">{{ sucursal.sucursal }}</h1>
+    </div>
+    <div class="doc-meta">
+      <span class="meta-label">Semana</span>
+      <strong>{{ semana.etiqueta_semana or '—' }}</strong>
+      {% if periodo %}<div>{{ periodo }}</div>{% endif %}
+      {% if semana.temporada %}<div class="meta-label" style="margin-top:2mm;">Temp {{ semana.temporada }}</div>{% endif %}
+    </div>
+  </div>
+  <div class="doc-sub">
+    {% if supervisor %}<span class="doc-sub-item"><span class="meta-label">Supervisor</span> <strong>{{ supervisor }}</strong></span>{% endif %}
+    <span class="doc-sub-item"><span class="meta-label">Saco</span> <strong>25 kg</strong></span>
+  </div>
+</header>
+
+{% if not casetas and not orfanos %}
+<div class="empty">
+  No hay programas cargados para este campo en la semana seleccionada.
+</div>
+{% endif %}
+
+{% for cas in casetas %}
+<section class="caseta">
+  <div class="caseta-head">
+    <span>Caseta {{ cas.nombre }}</span>
+    <span class="total">{{ cas.total_kg_fmt }} kg totales</span>
+  </div>
+
+  {% for eq in cas.equipos %}
+  <div class="equipo">
+    <div class="equipo-head">Equipo {{ eq.nombre }}</div>
+
+    {% for sec in eq.sectores %}
+    <article class="sector">
+      <header class="sector-head">
+        <span>Sector {{ sec.nombre }}</span>
+        <span class="sector-meta">
+          {{ sec.n_cuarteles }} cuartel{{ 'es' if sec.n_cuarteles != 1 else '' }} ·
+          {{ sec.sup_fmt }} ha
+        </span>
+      </header>
+
+      <div class="sector-body">
+        {% for cu in sec.cuarteles %}
+        <div class="cuartel">
+          <div class="cuartel-head">
+            <span>
+              <span class="cuartel-name">{{ cu.nombre }}</span>
+              <span class="cuartel-meta">· {{ cu.variedad }} · {{ cu.sup_sector_fmt }} ha de este sector</span>
+              <span class="cuartel-etapa">{{ cu.etapa }}</span>
+            </span>
+          </div>
+
+          <table class="prod-table">
+            <thead>
+              <tr>
+                <th>Producto</th>
+                <th class="num">Dosis kg/ha</th>
+                <th class="num">Kg aplicar</th>
+                <th class="num">Sacos 25kg</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for p in cu.productos %}
+              <tr>
+                <td class="prod-name">{{ p.nombre }}</td>
+                <td class="num">{{ p.dosis_fmt }}</td>
+                <td class="num">{{ p.kg_fmt }}</td>
+                <td class="num sacos">{{ p.sacos }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% endfor %}
+      </div>
+
+      {% if sec.totales and sec.n_cuarteles > 1 %}
+      <div class="sector-totales">
+        <span class="sector-totales-label">Total sector</span>
+        {% for t in sec.totales %}
+        <span class="sector-totales-item">
+          <span class="prod">{{ t.nombre }}</span>
+          <span class="kg">{{ t.kg_fmt }} kg</span>
+          <span class="sacos">({{ t.sacos }} sacos)</span>
+        </span>
+        {% endfor %}
+      </div>
+      {% endif %}
+    </article>
+    {% endfor %}
+  </div>
+  {% endfor %}
+</section>
+{% endfor %}
+
+{% if orfanos %}
+<section class="orfanos">
+  <div class="orfanos-head">Cuarteles sin sector de riego asignado</div>
+  <p class="orfanos-sub">Los siguientes cuarteles tienen programa esta semana pero no están vinculados a ningún sector. Aplicar a toda la superficie productiva.</p>
+
+  {% for cu in orfanos %}
+  <div class="cuartel">
+    <div class="cuartel-head">
+      <span>
+        <span class="cuartel-name">{{ cu.nombre }}</span>
+        <span class="cuartel-meta">· {{ cu.variedad }} · {{ cu.sup_fmt }} ha</span>
+        <span class="cuartel-etapa">{{ cu.etapa }}</span>
+      </span>
+    </div>
+    {% if cu.productos %}
+    <table class="prod-table">
+      <thead>
+        <tr>
+          <th>Producto</th>
+          <th class="num">Dosis kg/ha</th>
+          <th class="num">Kg aplicar</th>
+          <th class="num">Sacos 25kg</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for p in cu.productos %}
+        <tr>
+          <td class="prod-name">{{ p.nombre }}</td>
+          <td class="num">{{ p.dosis_fmt }}</td>
+          <td class="num">{{ p.kg_fmt }}</td>
+          <td class="num sacos">{{ p.sacos }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% endif %}
+  </div>
+  {% endfor %}
+</section>
+{% endif %}
+
+{% if totales_campo %}
+<section class="totales-campo">
+  <div class="totales-campo-head">
+    <span class="totales-campo-title">Total bodega del campo</span>
+    <span class="totales-campo-sub">retiro consolidado para {{ sucursal.sucursal }}</span>
+  </div>
+
+  <table class="totales-table">
+    <thead>
+      <tr>
+        <th>Producto</th>
+        <th class="num">Kg totales</th>
+        <th class="num">Sacos 25kg</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for t in totales_campo %}
+      <tr>
+        <td>{{ t.nombre }}</td>
+        <td class="num">{{ t.kg_fmt }}</td>
+        <td class="num">{{ t.sacos }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+    <tfoot>
+      <tr>
+        <td>TOTAL</td>
+        <td class="num">{{ total_kg_campo_fmt }} kg</td>
+        <td class="num">{{ total_sacos_campo }}</td>
+      </tr>
+    </tfoot>
+  </table>
+</section>
+{% endif %}
+
+</body>
+</html>
