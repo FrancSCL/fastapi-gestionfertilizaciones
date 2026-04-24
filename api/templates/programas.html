@@ -49,19 +49,19 @@
         <th>Variedad</th>
         <th>Portainjerto</th>
         <th class="num">Sup. Productiva</th>
-        <th>Temporada</th>
+        <th>Semanas</th>
         <th>Sucursal</th>
         <th></th>
       </tr>
     </thead>
     <tbody>
       {% for p in programas %}
-      <tr onclick="window.location.href='/app/matriz/{{ p.id }}'">
+      <tr onclick="window.location.href='/app/matriz/{{ p.id_cuartel }}'">
         <td class="cuartel-name">{{ p.cuartel }}</td>
         <td><span class="tag">{{ p.variedad or '—' }}</span></td>
         <td><span class="tag">{{ p.portainjerto or '—' }}</span></td>
-        <td class="num"><span class="sup-value">{{ p.sup_productiva }}</span><span class="sup-unit">ha</span></td>
-        <td>{{ p.temporada }}</td>
+        <td class="num"><span class="sup-value">{{ '%.2f' | format(p.sup_productiva | float) }}</span><span class="sup-unit">ha</span></td>
+        <td>{{ p.num_programas }} sem.</td>
         <td><span class="tag tag-sucursal">{{ p.sucursal }}</span></td>
         <td>
           <svg class="row-arrow" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">

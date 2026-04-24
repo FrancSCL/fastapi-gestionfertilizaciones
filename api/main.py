@@ -181,6 +181,7 @@ def web_programas(request: Request, temporada: int | None = None, sucursal: int 
             "temporadas": temporadas,
             "sucursales": get_sucursales(),
             "grupos": grupos,
+            "programas": cuarteles,
             "total_cuarteles": len(cuarteles),
             "filtro_temporada": temporada,
             "filtro_sucursal": id_suc,
