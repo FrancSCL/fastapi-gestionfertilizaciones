@@ -4,73 +4,149 @@
 
     <div class="add-prod-head">
       <div class="add-prod-search-wrap">
-        <svg class="add-prod-search-icon" viewBox="0 0 24 24" width="14" height="14" fill="none"
+        <svg class="add-prod-search-icon" viewBox="0 0 24 24" width="15" height="15" fill="none"
              stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
         </svg>
-        <input type="text" id="addProdSearch" placeholder="Buscar producto o nutriente (N, NPK, K…)" autofocus>
+        <input type="text" id="addProdSearch" placeholder="Filtrar por nombre o por nutriente (N, K, NPK…)" autofocus>
       </div>
-      <span class="add-prod-counter">
-        <span id="addProdCount">0</span> seleccionado<span id="addProdPlural"></span>
-      </span>
+      <div class="add-prod-chip-nuts" id="addProdNutFilter">
+        {% for letra in ['N','P','K','Mg','B','Ca','Zn','Mn'] %}
+        <button type="button" class="add-prod-chip-nut" data-nut="{{ letra | lower }}">{{ letra }}</button>
+        {% endfor %}
+      </div>
     </div>
 
-    <div class="add-prod-list" id="addProdList">
+    <div class="add-prod-grid" id="addProdGrid">
       {% for p in productos %}
-      <label class="add-prod-item"
+      <label class="add-prod-card"
              data-name="{{ p.nombre_comercial | lower }}"
              data-sigla="{{ p.sigla_nut | lower }}">
-        <input type="checkbox" name="id_producto" value="{{ p.id }}" class="add-prod-check">
-        <span class="add-prod-name">{{ p.nombre_comercial }}</span>
-        {% if p.sigla_nut %}
-        <span class="add-prod-sigla">{{ p.sigla_nut }}</span>
-        {% endif %}
+        <input type="checkbox" name="id_producto" value="{{ p.id }}" hidden>
+        <span class="add-prod-card-tick" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor"
+               stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="20 6 9 17 4 12"/>
+          </svg>
+        </span>
+        <span class="add-prod-card-body">
+          <span class="add-prod-card-name">{{ p.nombre_comercial }}</span>
+          {% if p.sigla_nut %}
+          <span class="add-prod-card-sigla">{{ p.sigla_nut }}</span>
+          {% else %}
+          <span class="add-prod-card-sigla add-prod-card-sigla-empty">sin nut.</span>
+          {% endif %}
+        </span>
       </label>
       {% else %}
-      <div class="add-prod-empty">No hay productos disponibles para agregar.</div>
+      <div class="add-prod-empty">Todos los fertilizantes ya están en la matriz.</div>
       {% endfor %}
     </div>
 
-    <div class="add-prod-actions">
-      <button type="submit" class="filter-btn" id="addProdSubmit" disabled>Agregar seleccionados</button>
-      <button type="button" class="filter-btn filter-btn-ghost"
-              onclick="document.getElementById('add-prod-panel').innerHTML=''">Cancelar</button>
-    </div>
+    <p class="add-prod-nomatch hidden" id="addProdNoMatch">Ningún producto coincide con el filtro.</p>
+
+    <footer class="add-prod-footer">
+      <div class="add-prod-summary" id="addProdSummary">
+        <span class="add-prod-summary-empty">Ningún producto seleccionado</span>
+      </div>
+      <div class="add-prod-actions">
+        <button type="button" class="filter-btn filter-btn-ghost"
+                onclick="document.getElementById('add-prod-panel').innerHTML=''">Cancelar</button>
+        <button type="submit" class="filter-btn add-prod-submit" id="addProdSubmit" disabled>
+          <span id="addProdSubmitLabel">Agregar</span>
+        </button>
+      </div>
+    </footer>
   </form>
 </div>
 
 <script>
   (function() {
     const form = document.getElementById('addProdForm');
-    const search = document.getElementById('addProdSearch');
-    const list = document.getElementById('addProdList');
-    const counter = document.getElementById('addProdCount');
-    const plural = document.getElementById('addProdPlural');
-    const submit = document.getElementById('addProdSubmit');
     if (!form) return;
-    const items = Array.from(list.querySelectorAll('.add-prod-item'));
-    const checks = () => items.map(it => it.querySelector('.add-prod-check'));
+    const search = document.getElementById('addProdSearch');
+    const nutFilterBar = document.getElementById('addProdNutFilter');
+    const grid = document.getElementById('addProdGrid');
+    const noMatch = document.getElementById('addProdNoMatch');
+    const summary = document.getElementById('addProdSummary');
+    const submit = document.getElementById('addProdSubmit');
+    const submitLabel = document.getElementById('addProdSubmitLabel');
 
-    function refresh() {
-      const count = checks().filter(c => c.checked).length;
-      counter.textContent = count;
-      plural.textContent = count === 1 ? '' : 's';
-      submit.disabled = count === 0;
+    const cards = Array.from(grid.querySelectorAll('.add-prod-card'));
+    const activeNuts = new Set();
+    let query = '';
+
+    function renderSummary() {
+      const sel = cards.filter(c => c.querySelector('input').checked);
+      summary.innerHTML = '';
+      if (sel.length === 0) {
+        summary.innerHTML = '<span class="add-prod-summary-empty">Ningún producto seleccionado</span>';
+      } else {
+        sel.forEach(c => {
+          const chip = document.createElement('span');
+          chip.className = 'add-prod-summary-chip';
+          chip.innerHTML = `<span>${c.querySelector('.add-prod-card-name').textContent}</span>
+            <button type="button" class="add-prod-summary-remove" aria-label="Quitar">×</button>`;
+          chip.querySelector('button').addEventListener('click', () => {
+            c.querySelector('input').checked = false;
+            c.classList.remove('is-selected');
+            renderSummary();
+          });
+          summary.appendChild(chip);
+        });
+      }
+      submit.disabled = sel.length === 0;
+      submitLabel.textContent = sel.length === 0 ? 'Agregar'
+        : (sel.length === 1 ? 'Agregar 1 producto' : `Agregar ${sel.length} productos`);
     }
 
-    function filter() {
-      const q = search.value.trim().toLowerCase();
-      items.forEach(it => {
-        const n = it.dataset.name || '';
-        const s = it.dataset.sigla || '';
-        it.style.display = (!q || n.includes(q) || s.includes(q)) ? '' : 'none';
+    function applyFilter() {
+      let shown = 0;
+      cards.forEach(c => {
+        const name = c.dataset.name || '';
+        const sigla = c.dataset.sigla || '';
+        const nameHit = !query || name.includes(query) || sigla.includes(query);
+        const nutHit = activeNuts.size === 0
+          || Array.from(activeNuts).every(n => sigla.includes(n));
+        const visible = nameHit && nutHit;
+        c.classList.toggle('hidden', !visible);
+        if (visible) shown++;
       });
+      noMatch.classList.toggle('hidden', shown > 0 || cards.length === 0);
     }
 
-    list.addEventListener('change', e => {
-      if (e.target.classList.contains('add-prod-check')) refresh();
+    // Click en la tarjeta toggle
+    grid.addEventListener('click', e => {
+      const card = e.target.closest('.add-prod-card');
+      if (!card) return;
+      const input = card.querySelector('input');
+      setTimeout(() => {
+        card.classList.toggle('is-selected', input.checked);
+        renderSummary();
+      }, 0);
     });
-    search.addEventListener('input', filter);
-    refresh();
+
+    // Buscador
+    search.addEventListener('input', () => {
+      query = search.value.trim().toLowerCase();
+      applyFilter();
+    });
+
+    // Chips de nutrientes
+    nutFilterBar.addEventListener('click', e => {
+      const btn = e.target.closest('.add-prod-chip-nut');
+      if (!btn) return;
+      const nut = btn.dataset.nut;
+      if (activeNuts.has(nut)) {
+        activeNuts.delete(nut);
+        btn.classList.remove('is-active');
+      } else {
+        activeNuts.add(nut);
+        btn.classList.add('is-active');
+      }
+      applyFilter();
+    });
+
+    renderSummary();
   })();
 </script>
