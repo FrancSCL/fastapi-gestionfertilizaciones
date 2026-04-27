@@ -356,12 +356,16 @@ def get_ur_cuartel(id_cuartel: int, id_temporada: int | None = None) -> dict | N
 
 def calcular_unidades(ton_estimadas: float, vigor_factor: float,
                       especie: str, factores: list) -> dict:
+    """UR por nutriente. Por regla de gerencia, el vigor solo afecta al N;
+    el resto de los nutrientes se calculan sin ajustar por vigor.
+    """
     col = _col_especie(especie)
     resultado = {}
     for f in factores:
         fert = f["fertilizante"]
         factor_esp = float(f[col] or 0)
-        resultado[fert] = round(ton_estimadas * vigor_factor * factor_esp, 2)
+        vigor = vigor_factor if (fert or "").upper() == "N" else 1.0
+        resultado[fert] = round(ton_estimadas * vigor * factor_esp, 2)
     return resultado
 
 
