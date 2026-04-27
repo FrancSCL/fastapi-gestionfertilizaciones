@@ -166,30 +166,59 @@ def app_root():
     return RedirectResponse(url="/app/programas")
 
 
+def _to_int(v):
+    """Convierte string vacio o None a None, sino a int."""
+    if v is None or v == "":
+        return None
+    try:
+        return int(v)
+    except (TypeError, ValueError):
+        return None
+
+
 @app.get("/app/programas", response_class=HTMLResponse)
 def web_programas(
     request: Request,
-    temporada: int | None = None,
-    sucursal: int | None = None,
-    especie: int | None = None,
-    variedad: int | None = None,
+    temporada: str | None = None,
+    sucursal: str | None = None,
+    especie: str | None = None,
+    variedad: str | None = None,
 ):
+    # Tolerar query params vacios (?variedad= que mande el form al limpiar)
+    temporada_id = _to_int(temporada)
+    sucursal_id = _to_int(sucursal)
+    especie_id = _to_int(especie)
+    variedad_id = _to_int(variedad)
+
     temporadas = get_temporadas()
-    id_suc = _id_sucursal(request, sucursal)
-    # Validar coherencia: si la variedad no pertenece a la especie filtrada, ignorarla
-    variedades_de_especie = get_variedades(especie) if especie else get_variedades()
-    if variedad and especie:
+    id_suc = _id_sucursal(request, sucursal_id)
+
+    # Especies y variedades acotadas a la sucursal activa
+    especies_disponibles = get_especies(id_sucursal=id_suc)
+    variedades_de_especie = get_variedades(id_especie=especie_id, id_sucursal=id_suc)
+
+    # Si la variedad seleccionada no esta en el filtro actual, descartarla
+    if variedad_id:
         ids_validos = {v["id"] for v in variedades_de_especie}
-        if variedad not in ids_validos:
-            variedad = None
+        if variedad_id not in ids_validos:
+            variedad_id = None
+
+    # Si la especie seleccionada no esta en las disponibles, descartarla
+    if especie_id:
+        ids_esp_validos = {e["id"] for e in especies_disponibles}
+        if especie_id not in ids_esp_validos:
+            especie_id = None
+            variedad_id = None
+            variedades_de_especie = get_variedades(id_sucursal=id_suc)
+
     cuarteles = listar_cuarteles_con_programas(
-        id_temporada=temporada,
+        id_temporada=temporada_id,
         id_sucursal=id_suc,
-        id_especie=especie,
-        id_variedad=variedad,
+        id_especie=especie_id,
+        id_variedad=variedad_id,
     )
     grupos = agrupar_por_sucursal(cuarteles)
-    semanas = get_semanas_disponibles(id_temporada=temporada, id_sucursal=id_suc)
+    semanas = get_semanas_disponibles(id_temporada=temporada_id, id_sucursal=id_suc)
     return templates.TemplateResponse(
         "programas.html",
         {
@@ -197,15 +226,15 @@ def web_programas(
             "active_page": "programas",
             "temporadas": temporadas,
             "sucursales": get_sucursales(),
-            "especies": get_especies(),
+            "especies": especies_disponibles,
             "variedades": variedades_de_especie,
             "grupos": grupos,
             "programas": cuarteles,
             "total_cuarteles": len(cuarteles),
-            "filtro_temporada": temporada,
+            "filtro_temporada": temporada_id,
             "filtro_sucursal": id_suc,
-            "filtro_especie": especie,
-            "filtro_variedad": variedad,
+            "filtro_especie": especie_id,
+            "filtro_variedad": variedad_id,
             "semanas": semanas,
         },
     )

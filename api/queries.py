@@ -94,29 +94,41 @@ def listar_cuarteles_con_programas(
             return cur.fetchall()
 
 
-def get_especies() -> list:
-    """Solo especies con al menos un cuartel productivo (sup_productiva > 0)."""
-    sql = """
+def get_especies(id_sucursal: int | None = None) -> list:
+    """Solo especies con al menos un cuartel productivo (sup_productiva > 0).
+    Si se pasa id_sucursal, ademas se acotan a esa sucursal."""
+    where = ["c.sup_productiva > 0"]
+    params: list = []
+    if id_sucursal:
+        where.append("c.id_sucursal = %s")
+        params.append(id_sucursal)
+    where_sql = " AND ".join(where)
+    sql = f"""
         SELECT DISTINCT e.id, e.especie
         FROM DIM_GENERAL_ESPECIE e
         JOIN DIM_GENERAL_VARIEDAD v ON v.id_especie = e.id
         JOIN DIM_GENERAL_CECO     c ON c.id_variedad = v.id
-        WHERE c.sup_productiva > 0
+        WHERE {where_sql}
         ORDER BY e.especie
     """
     with get_connection() as conn:
         with conn.cursor() as cur:
-            cur.execute(sql)
+            cur.execute(sql, params)
             return cur.fetchall()
 
 
-def get_variedades(id_especie: int | None = None) -> list:
-    """Solo variedades con al menos un cuartel productivo, opcionalmente filtradas por especie."""
+def get_variedades(id_especie: int | None = None,
+                   id_sucursal: int | None = None) -> list:
+    """Solo variedades con al menos un cuartel productivo, opcionalmente filtradas
+    por especie y/o sucursal."""
     where = ["c.sup_productiva > 0"]
     params: list = []
     if id_especie:
         where.append("v.id_especie = %s")
         params.append(id_especie)
+    if id_sucursal:
+        where.append("c.id_sucursal = %s")
+        params.append(id_sucursal)
     where_sql = " AND ".join(where)
     sql = f"""
         SELECT DISTINCT v.id, v.variedad, v.id_especie
