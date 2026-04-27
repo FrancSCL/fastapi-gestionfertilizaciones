@@ -26,6 +26,8 @@ def get_sucursales() -> list:
 def listar_cuarteles_con_programas(
     id_temporada: int | None = None,
     id_sucursal: int | None = None,
+    id_especie: int | None = None,
+    id_variedad: int | None = None,
     filtro_ur: str = "con_ur",  # 'con_ur', 'sin_ur', 'todos'
 ) -> list:
     """Lista cuarteles con programas, incluyendo flag de si tienen UR para la temporada."""
@@ -36,6 +38,10 @@ def listar_cuarteles_con_programas(
         where.append("prog.id_temporada = %s")
     if id_sucursal:
         where.append("suc.id = %s")
+    if id_especie:
+        where.append("var.id_especie = %s")
+    if id_variedad:
+        where.append("ceco.id_variedad = %s")
     where_sql = "WHERE " + " AND ".join(where)
 
     having_clause = {
@@ -49,13 +55,18 @@ def listar_cuarteles_con_programas(
         + list(SUCURSALES_VISIBLES)
         + ([id_temporada] if id_temporada else [])
         + ([id_sucursal] if id_sucursal else [])
+        + ([id_especie] if id_especie else [])
+        + ([id_variedad] if id_variedad else [])
     )
 
     sql = f"""
         SELECT
             ceco.id                     AS id_cuartel,
             ceco.descripcion_ceco       AS cuartel,
+            var.id                      AS id_variedad,
             var.variedad                AS variedad,
+            esp.id                      AS id_especie,
+            esp.especie                 AS especie,
             port.portainjerto           AS portainjerto,
             ceco.sup_productiva         AS sup_productiva,
             suc.id                      AS id_sucursal,
@@ -66,11 +77,13 @@ def listar_cuarteles_con_programas(
         JOIN DIM_GENERAL_CECO             ceco ON ceco.id = prog.id_cuartel
         JOIN DIM_GENERAL_SUCURSAL         suc  ON suc.id  = ceco.id_sucursal
         LEFT JOIN DIM_GENERAL_VARIEDAD    var  ON var.id  = ceco.id_variedad
+        LEFT JOIN DIM_GENERAL_ESPECIE     esp  ON esp.id  = var.id_especie
         LEFT JOIN DIM_GENERAL_PORTAINJERTO port ON port.id = ceco.portainjerto
         LEFT JOIN FACT_AREATECNICA_FERTILIZACION_UNIDADESREQUERIDAS ur
                   ON ur.id_cuartel = ceco.id {ur_cond}
         {where_sql}
-        GROUP BY ceco.id, ceco.descripcion_ceco, var.variedad, port.portainjerto,
+        GROUP BY ceco.id, ceco.descripcion_ceco, var.id, var.variedad,
+                 esp.id, esp.especie, port.portainjerto,
                  ceco.sup_productiva, suc.id, suc.sucursal
         {having_clause}
         ORDER BY suc.sucursal, ceco.descripcion_ceco
@@ -78,6 +91,27 @@ def listar_cuarteles_con_programas(
     with get_connection() as conn:
         with conn.cursor() as cur:
             cur.execute(sql, final_params)
+            return cur.fetchall()
+
+
+def get_especies() -> list:
+    sql = "SELECT id, especie FROM DIM_GENERAL_ESPECIE ORDER BY especie"
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(sql)
+            return cur.fetchall()
+
+
+def get_variedades(id_especie: int | None = None) -> list:
+    if id_especie:
+        sql = "SELECT id, variedad, id_especie FROM DIM_GENERAL_VARIEDAD WHERE id_especie = %s ORDER BY variedad"
+        params: tuple = (id_especie,)
+    else:
+        sql = "SELECT id, variedad, id_especie FROM DIM_GENERAL_VARIEDAD ORDER BY variedad"
+        params = ()
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(sql, params)
             return cur.fetchall()
 
 

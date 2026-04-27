@@ -36,13 +36,33 @@
   </div>
 </div>
 
-<form method="get" action="/app/programas" class="filters">
+<form method="get" action="/app/programas" class="filters" id="filtersForm">
   <div class="filter-group">
     <label class="filter-label" for="temporada">Temporada</label>
     <select id="temporada" name="temporada" class="filter-select" onchange="this.form.submit()">
       <option value="">Todas las temporadas</option>
       {% for t in temporadas %}
       <option value="{{ t.id }}" {% if filtro_temporada == t.id %}selected{% endif %}>{{ t.temporada }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div class="filter-group">
+    <label class="filter-label" for="especie">Especie</label>
+    <select id="especie" name="especie" class="filter-select"
+            onchange="document.getElementById('variedad').value='';this.form.submit()">
+      <option value="">Todas las especies</option>
+      {% for e in especies %}
+      <option value="{{ e.id }}" {% if filtro_especie == e.id %}selected{% endif %}>{{ e.especie }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div class="filter-group">
+    <label class="filter-label" for="variedad">Variedad</label>
+    <select id="variedad" name="variedad" class="filter-select" onchange="this.form.submit()"
+            {% if not variedades %}disabled{% endif %}>
+      <option value="">{% if filtro_especie %}Todas las variedades{% else %}Todas las variedades{% endif %}</option>
+      {% for v in variedades %}
+      <option value="{{ v.id }}" {% if filtro_variedad == v.id %}selected{% endif %}>{{ v.variedad }}</option>
       {% endfor %}
     </select>
   </div>

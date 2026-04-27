@@ -11,7 +11,7 @@ from starlette.middleware.sessions import SessionMiddleware
 from .queries import (
     get_programa, get_productos, get_sectores,
     get_programas_semana, get_semanas_disponibles, get_productos_multiples, get_sectores_multiples,
-    get_temporadas, get_sucursales,
+    get_temporadas, get_sucursales, get_especies, get_variedades,
     listar_cuarteles_con_programas, agrupar_por_sucursal,
     get_cuartel_info, get_semanas_cuartel, get_productos_asignados, build_matriz,
     get_vigores, get_factores_all, get_estimaciones_cuartel,
@@ -167,10 +167,27 @@ def app_root():
 
 
 @app.get("/app/programas", response_class=HTMLResponse)
-def web_programas(request: Request, temporada: int | None = None, sucursal: int | None = None):
+def web_programas(
+    request: Request,
+    temporada: int | None = None,
+    sucursal: int | None = None,
+    especie: int | None = None,
+    variedad: int | None = None,
+):
     temporadas = get_temporadas()
     id_suc = _id_sucursal(request, sucursal)
-    cuarteles = listar_cuarteles_con_programas(id_temporada=temporada, id_sucursal=id_suc)
+    # Validar coherencia: si la variedad no pertenece a la especie filtrada, ignorarla
+    variedades_de_especie = get_variedades(especie) if especie else get_variedades()
+    if variedad and especie:
+        ids_validos = {v["id"] for v in variedades_de_especie}
+        if variedad not in ids_validos:
+            variedad = None
+    cuarteles = listar_cuarteles_con_programas(
+        id_temporada=temporada,
+        id_sucursal=id_suc,
+        id_especie=especie,
+        id_variedad=variedad,
+    )
     grupos = agrupar_por_sucursal(cuarteles)
     semanas = get_semanas_disponibles(id_temporada=temporada, id_sucursal=id_suc)
     return templates.TemplateResponse(
@@ -180,11 +197,15 @@ def web_programas(request: Request, temporada: int | None = None, sucursal: int 
             "active_page": "programas",
             "temporadas": temporadas,
             "sucursales": get_sucursales(),
+            "especies": get_especies(),
+            "variedades": variedades_de_especie,
             "grupos": grupos,
             "programas": cuarteles,
             "total_cuarteles": len(cuarteles),
             "filtro_temporada": temporada,
             "filtro_sucursal": id_suc,
+            "filtro_especie": especie,
+            "filtro_variedad": variedad,
             "semanas": semanas,
         },
     )
