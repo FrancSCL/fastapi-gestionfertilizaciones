@@ -38,15 +38,6 @@
 
 <form method="get" action="/app/programas" class="filters" id="filtersForm">
   <div class="filter-group">
-    <label class="filter-label" for="temporada">Temporada</label>
-    <select id="temporada" name="temporada" class="filter-select" onchange="this.form.submit()">
-      <option value="">Todas las temporadas</option>
-      {% for t in temporadas %}
-      <option value="{{ t.id }}" {% if filtro_temporada == t.id %}selected{% endif %}>{{ t.temporada }}</option>
-      {% endfor %}
-    </select>
-  </div>
-  <div class="filter-group">
     <label class="filter-label" for="especie">Especie</label>
     <select id="especie" name="especie" class="filter-select"
             onchange="document.getElementById('variedad').value='';this.form.submit()">
