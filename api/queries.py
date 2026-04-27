@@ -95,7 +95,15 @@ def listar_cuarteles_con_programas(
 
 
 def get_especies() -> list:
-    sql = "SELECT id, especie FROM DIM_GENERAL_ESPECIE ORDER BY especie"
+    """Solo especies con al menos un cuartel productivo (sup_productiva > 0)."""
+    sql = """
+        SELECT DISTINCT e.id, e.especie
+        FROM DIM_GENERAL_ESPECIE e
+        JOIN DIM_GENERAL_VARIEDAD v ON v.id_especie = e.id
+        JOIN DIM_GENERAL_CECO     c ON c.id_variedad = v.id
+        WHERE c.sup_productiva > 0
+        ORDER BY e.especie
+    """
     with get_connection() as conn:
         with conn.cursor() as cur:
             cur.execute(sql)
@@ -103,12 +111,20 @@ def get_especies() -> list:
 
 
 def get_variedades(id_especie: int | None = None) -> list:
+    """Solo variedades con al menos un cuartel productivo, opcionalmente filtradas por especie."""
+    where = ["c.sup_productiva > 0"]
+    params: list = []
     if id_especie:
-        sql = "SELECT id, variedad, id_especie FROM DIM_GENERAL_VARIEDAD WHERE id_especie = %s ORDER BY variedad"
-        params: tuple = (id_especie,)
-    else:
-        sql = "SELECT id, variedad, id_especie FROM DIM_GENERAL_VARIEDAD ORDER BY variedad"
-        params = ()
+        where.append("v.id_especie = %s")
+        params.append(id_especie)
+    where_sql = " AND ".join(where)
+    sql = f"""
+        SELECT DISTINCT v.id, v.variedad, v.id_especie
+        FROM DIM_GENERAL_VARIEDAD v
+        JOIN DIM_GENERAL_CECO c ON c.id_variedad = v.id
+        WHERE {where_sql}
+        ORDER BY v.variedad
+    """
     with get_connection() as conn:
         with conn.cursor() as cur:
             cur.execute(sql, params)
