@@ -39,23 +39,13 @@
 <form method="get" action="/app/programas" class="filters">
   <div class="filter-group">
     <label class="filter-label" for="temporada">Temporada</label>
-    <select id="temporada" name="temporada" class="filter-select">
+    <select id="temporada" name="temporada" class="filter-select" onchange="this.form.submit()">
       <option value="">Todas las temporadas</option>
       {% for t in temporadas %}
       <option value="{{ t.id }}" {% if filtro_temporada == t.id %}selected{% endif %}>{{ t.temporada }}</option>
       {% endfor %}
     </select>
   </div>
-  <div class="filter-group">
-    <label class="filter-label" for="sucursal">Sucursal</label>
-    <select id="sucursal" name="sucursal" class="filter-select">
-      <option value="">Todas las sucursales</option>
-      {% for s in sucursales %}
-      <option value="{{ s.id }}" {% if filtro_sucursal == s.id %}selected{% endif %}>{{ s.sucursal }}</option>
-      {% endfor %}
-    </select>
-  </div>
-  <button type="submit" class="filter-btn">Aplicar</button>
 </form>
 
 <div class="data-table-wrap">
