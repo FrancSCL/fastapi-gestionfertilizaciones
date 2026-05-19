@@ -405,9 +405,10 @@ def productos_disponibles_fragment(request: Request, id_cuartel: int, temporada:
 @app.post("/app/matriz/{id_cuartel}/agregar-producto")
 def agregar_producto(
     id_cuartel: int,
-    id_producto: list[int] = Form(...),
+    id_producto: list[str] = Form(...),
     temporada: int | None = Form(None),
 ):
+    # id_producto en BD es varchar(25) (UUID), no int
     ids_prog = get_programas_cuartel(id_cuartel, temporada)
     for pid in id_producto:
         agregar_producto_semanas(ids_prog, pid)
@@ -418,7 +419,7 @@ def agregar_producto(
 @app.post("/app/matriz/{id_cuartel}/eliminar-producto")
 def eliminar_producto(
     id_cuartel: int,
-    id_producto: int = Form(...),
+    id_producto: str = Form(...),
     temporada: int | None = Form(None),
 ):
     ids_prog = get_programas_cuartel(id_cuartel, temporada)
@@ -431,7 +432,7 @@ def eliminar_producto(
 def guardar_dosis(
     id_cuartel: int,
     id_programa: str = Form(...),
-    id_producto: int = Form(...),
+    id_producto: str = Form(...),
     dosis: float = Form(...),
 ):
     update_dosis(id_programa, id_producto, dosis)
