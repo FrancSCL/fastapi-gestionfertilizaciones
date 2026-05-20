@@ -129,6 +129,7 @@ def do_login(
     request.session["user_usuario"] = user["usuario"]
     request.session["user_name"] = (nombre + " " + apellido).strip() or user["usuario"]
     request.session["user_initials"] = ((nombre[:1] + apellido[:1]).upper() or user["usuario"][:2].upper())
+    request.session["user_rol"] = user.get("rol") or "user"
     destino = next if next and next.startswith("/") else "/app/programas"
     return RedirectResponse(url=destino, status_code=303)
 
@@ -158,6 +159,15 @@ def set_sucursal(
 
 def _id_responsable(request: Request) -> int:
     return int(request.session.get("user_id") or 0)
+
+
+def _es_admin(request: Request) -> bool:
+    return (request.session.get("user_rol") or "user") == "admin"
+
+
+def _require_admin(request: Request) -> None:
+    if not _es_admin(request):
+        raise HTTPException(status_code=403, detail="Acceso restringido a administradores.")
 
 
 # ══ WEB APP ═══════════════════════════════════════════════════════════════════
@@ -508,6 +518,7 @@ def eliminar_semana(
 
 @app.get("/app/parametros", response_class=HTMLResponse)
 def web_parametros(request: Request):
+    _require_admin(request)
     return templates.TemplateResponse(
         "parametros.html",
         {
@@ -521,16 +532,19 @@ def web_parametros(request: Request):
 
 @app.post("/app/parametros/vigor")
 def post_vigor(
+    request: Request,
     id: int | None = Form(None),
     vigor: str = Form(...),
     factor: float = Form(...),
 ):
+    _require_admin(request)
     save_vigor(id, vigor, factor)
     return RedirectResponse(url="/app/parametros", status_code=303)
 
 
 @app.post("/app/parametros/factor/{id_factor}")
 def post_factor(
+    request: Request,
     id_factor: int,
     factor_uva: float = Form(0),
     factor_cereza: float = Form(0),
@@ -539,6 +553,7 @@ def post_factor(
     factor_durazno: float = Form(0),
     factor_damasco: float = Form(0),
 ):
+    _require_admin(request)
     save_factor(
         id_factor,
         factor_uva=factor_uva,
@@ -553,6 +568,7 @@ def post_factor(
 
 @app.get("/app/parametros/productos", response_class=HTMLResponse)
 def web_productos(request: Request):
+    _require_admin(request)
     return templates.TemplateResponse(
         "productos.html",
         {
@@ -566,6 +582,7 @@ def web_productos(request: Request):
 
 @app.post("/app/parametros/productos")
 def crear_producto(
+    request: Request,
     nombre_comercial: str = Form(...),
     id_unidad: int = Form(...),
     codigo_softland: int | None = Form(None),
@@ -579,6 +596,7 @@ def crear_producto(
     zn: float = Form(0),
     mn: float = Form(0),
 ):
+    _require_admin(request)
     # UI envia 0-100, BD guarda fracciones 0-1
     save_producto(nombre_comercial, id_unidad, codigo_softland,
                   n/100, k/100, p/100, mg/100, b/100, ca/100, zn/100, mn/100,
@@ -588,6 +606,7 @@ def crear_producto(
 
 @app.post("/app/parametros/productos/{id_producto}/nutrientes")
 def editar_nutrientes(
+    request: Request,
     id_producto: str,
     eficiencia: float = Form(100),
     n: float = Form(0),
@@ -599,6 +618,7 @@ def editar_nutrientes(
     zn: float = Form(0),
     mn: float = Form(0),
 ):
+    _require_admin(request)
     # UI envia 0-100, BD guarda fracciones 0-1
     update_producto_nutrientes(
         id_producto,

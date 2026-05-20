@@ -1103,7 +1103,7 @@ def get_semana_info(etiqueta_semana: str) -> dict | None:
 
 def validar_login(usuario: str, contrasena: str) -> dict | None:
     sql = """
-        SELECT id, usuario, nombre, apellido
+        SELECT id, usuario, nombre, apellido, COALESCE(rol, 'user') AS rol
         FROM z_usuarios_test
         WHERE usuario = %s AND `contraseña` = %s
         LIMIT 1
