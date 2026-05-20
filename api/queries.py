@@ -1102,13 +1102,32 @@ def get_semana_info(etiqueta_semana: str) -> dict | None:
 # ══ AUTH ═══════════════════════════════════════════════════════════════════════
 
 def validar_login(usuario: str, contrasena: str) -> dict | None:
-    sql = """
+    """Valida credenciales. Tolerante a que la columna `rol` aun no exista
+    (default 'user')."""
+    sql_con_rol = """
         SELECT id, usuario, nombre, apellido, COALESCE(rol, 'user') AS rol
         FROM z_usuarios_test
         WHERE usuario = %s AND `contraseña` = %s
         LIMIT 1
     """
+    sql_sin_rol = """
+        SELECT id, usuario, nombre, apellido
+        FROM z_usuarios_test
+        WHERE usuario = %s AND `contraseña` = %s
+        LIMIT 1
+    """
+    import pymysql
     with get_connection() as conn:
         with conn.cursor() as cur:
-            cur.execute(sql, (usuario, contrasena))
-            return cur.fetchone()
+            try:
+                cur.execute(sql_con_rol, (usuario, contrasena))
+                return cur.fetchone()
+            except pymysql.err.OperationalError as e:
+                # 1054 = Unknown column. Cae aqui si la columna `rol` no existe.
+                if e.args and e.args[0] == 1054:
+                    cur.execute(sql_sin_rol, (usuario, contrasena))
+                    row = cur.fetchone()
+                    if row is not None:
+                        row["rol"] = "user"
+                    return row
+                raise
