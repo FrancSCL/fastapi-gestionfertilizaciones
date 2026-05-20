@@ -247,7 +247,12 @@ def web_matriz_root():
 
 
 @app.get("/app/matriz/{id_cuartel}", response_class=HTMLResponse)
-def web_matriz(request: Request, id_cuartel: int, temporada: int | None = None):
+def web_matriz(
+    request: Request,
+    id_cuartel: int,
+    temporada: int | None = None,
+    err: str | None = None,
+):
     cuartel = get_cuartel_info(id_cuartel)
     if not cuartel:
         raise HTTPException(status_code=404, detail="Cuartel no encontrado")
@@ -261,6 +266,11 @@ def web_matriz(request: Request, id_cuartel: int, temporada: int | None = None):
     matriz = build_matriz(semanas_rows, productos_rows)
     ur = get_ur_cuartel(id_cuartel, id_temp)
 
+    errores = {
+        "semana_duplicada": "Esa semana ya estaba en el programa. No se duplicó.",
+    }
+    alert_msg = errores.get(err) if err else None
+
     return templates.TemplateResponse(
         "matriz.html",
         {
@@ -271,6 +281,7 @@ def web_matriz(request: Request, id_cuartel: int, temporada: int | None = None):
             "ur": ur,
             "temporadas": temporadas,
             "filtro_temporada": temporada,
+            "alert_msg": alert_msg,
         },
     )
 
@@ -468,15 +479,16 @@ def agregar_semana(
     etapa: str = Form("PRECOSECHA"),
     temporada: int = Form(...),
 ):
-    agregar_semana_programa(
+    _, created = agregar_semana_programa(
         id_cuartel=id_cuartel,
         id_temporada=temporada,
         id_semana=id_semana,
         etapa=etapa,
         id_responsable=_id_responsable(request),
     )
+    err_qs = "" if created else "&err=semana_duplicada"
     return RedirectResponse(
-        url=f"/app/matriz/{id_cuartel}?temporada={temporada}",
+        url=f"/app/matriz/{id_cuartel}?temporada={temporada}{err_qs}",
         status_code=303,
     )
 

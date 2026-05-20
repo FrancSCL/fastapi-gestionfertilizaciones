@@ -925,6 +925,40 @@ h4 { font-size: 0.875rem; text-transform: uppercase; letter-spacing: 0.04em; col
   gap: 6px;
 }
 
+.matriz-alert {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--sp-3);
+  margin: 0 0 var(--sp-3);
+  padding: 10px 14px;
+  background: #fef3c7;
+  border: 1px solid #f59e0b;
+  border-radius: 8px;
+  color: #78350f;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.matriz-alert-close {
+  width: 22px;
+  height: 22px;
+  background: transparent;
+  border: none;
+  color: #78350f;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  border-radius: 4px;
+  display: grid;
+  place-items: center;
+  transition: background 0.15s;
+}
+
+.matriz-alert-close:hover {
+  background: #fde68a;
+}
+
 .matriz-semana-delete {
   margin: 0;
   padding: 0;

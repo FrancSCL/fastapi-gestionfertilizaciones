@@ -35,6 +35,12 @@
 {% endblock %}
 
 {% block content %}
+{% if alert_msg %}
+<div class="matriz-alert" role="status">
+  <span>{{ alert_msg }}</span>
+  <button type="button" class="matriz-alert-close" onclick="this.parentElement.remove()" aria-label="Cerrar">×</button>
+</div>
+{% endif %}
 <div class="matriz-page">
 
   <!-- Resumen por producto -->

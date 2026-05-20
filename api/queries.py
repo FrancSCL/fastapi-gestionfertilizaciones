@@ -680,11 +680,12 @@ def get_semanas_disponibles_cuartel(id_cuartel: int, id_temporada: int) -> list:
                sem.anio_calendario, sem.fecha_inicio, sem.fecha_fin
         FROM DIM_GENERAL_SEMANASTEMPORADA sem
         WHERE sem.temporada = %s
-          AND sem.id NOT IN (
-              SELECT prog.semana
+          AND NOT EXISTS (
+              SELECT 1
               FROM FACT_AREATECNICA_FERTILIZACION_PROGRAMA prog
               WHERE prog.id_cuartel = %s
                 AND prog.id_temporada = %s
+                AND CAST(prog.semana AS UNSIGNED) = sem.id
           )
         ORDER BY sem.fecha_inicio
     """
@@ -695,11 +696,12 @@ def get_semanas_disponibles_cuartel(id_cuartel: int, id_temporada: int) -> list:
 
 
 def agregar_semana_programa(id_cuartel: int, id_temporada: int, id_semana: int,
-                             etapa: str, id_responsable: int) -> str:
+                             etapa: str, id_responsable: int) -> tuple[str, bool]:
     """Crea una fila en PROGRAMA y replica los productos ya existentes en otras
-    semanas del mismo cuartel/temporada con dosis 0. Retorna el id del programa
-    creado. Si ya existe la combinacion (cuartel, semana, temporada), retorna el id
-    existente sin duplicar."""
+    semanas del mismo cuartel/temporada con dosis 0.
+
+    Retorna (id_programa, created) — created=False si la combinacion
+    (cuartel, semana, temporada) ya existia."""
     from datetime import datetime
     id_programa = f"{id_cuartel}{id_semana}"
 
@@ -708,13 +710,14 @@ def agregar_semana_programa(id_cuartel: int, id_temporada: int, id_semana: int,
             # Si ya existe la semana en el programa, no insertar
             cur.execute(
                 """SELECT id FROM FACT_AREATECNICA_FERTILIZACION_PROGRAMA
-                   WHERE id_cuartel = %s AND id_temporada = %s AND semana = %s
+                   WHERE id_cuartel = %s AND id_temporada = %s
+                     AND CAST(semana AS UNSIGNED) = %s
                    LIMIT 1""",
-                (id_cuartel, id_temporada, str(id_semana)),
+                (id_cuartel, id_temporada, id_semana),
             )
             existing = cur.fetchone()
             if existing:
-                return existing["id"]
+                return existing["id"], False
 
             # Obtener fechas de la semana
             cur.execute(
@@ -769,7 +772,7 @@ def agregar_semana_programa(id_cuartel: int, id_temporada: int, id_semana: int,
                         (str(_uuid.uuid4())[:45], id_programa, pid),
                     )
         conn.commit()
-    return id_programa
+    return id_programa, True
 
 
 def eliminar_semana_programa(id_programa: str) -> None:
