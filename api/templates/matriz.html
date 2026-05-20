@@ -163,7 +163,7 @@
         {% if f != 1.0 %}{% set _ = tags_ajuste.append(lbl ~ '×' ~ ('%g' | format(f))) %}{% endif %}
       {% endfor %}
       {% if tags_ajuste %}
-      <a href="/app/unidades/{{ cuartel.id }}{% if filtro_temporada %}?temporada={{ filtro_temporada }}{% endif %}"
+      <a href="/app/ajuste-agronomico?cuartel={{ cuartel.id }}{% if filtro_temporada %}&temporada={{ filtro_temporada }}{% endif %}"
          class="cuartel-ajuste-badge" title="Click para editar el ajuste agronómico">
         <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor"
              stroke-width="2" stroke-linecap="round" stroke-linejoin="round">

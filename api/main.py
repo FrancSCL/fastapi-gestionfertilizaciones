@@ -18,6 +18,7 @@ from .queries import (
     get_ur_cuartel, calcular_unidades, save_unidades_requeridas,
     get_analisis_agronomico, save_analisis_agronomico, recalcular_ur_con_ajuste,
     tiene_ajuste_agronomico, get_cuarteles_con_ajuste_temporada,
+    listar_cuarteles_con_ajustes,
     save_vigor, save_factor,
     get_programas_cuartel, get_productos_disponibles,
     agregar_producto_semanas, update_dosis, eliminar_producto_cuartel,
@@ -348,9 +349,7 @@ def web_unidades(request: Request, id_cuartel: int, temporada: int | None = None
         raise HTTPException(status_code=404, detail="Cuartel no encontrado")
 
     temporadas = get_temporadas()
-    id_temp = temporada or (temporadas[0]["id"] if temporadas else None)
     estimaciones = get_estimaciones_cuartel(id_cuartel)
-    analisis = get_analisis_agronomico(id_cuartel, id_temp) if id_temp else None
 
     return templates.TemplateResponse(
         "unidades.html",
@@ -362,40 +361,25 @@ def web_unidades(request: Request, id_cuartel: int, temporada: int | None = None
             "vigores": get_vigores(),
             "estimaciones": estimaciones,
             "filtro_temporada": temporada,
-            "analisis": analisis,
         },
     )
 
 
-@app.post("/app/unidades/{id_cuartel}/analisis-agronomico")
-def post_analisis_agronomico(
+def _aplicar_ajuste_y_regenerar_ur(
     request: Request,
     id_cuartel: int,
-    temporada: int = Form(...),
-    factor_n: float = Form(1.0),
-    factor_k: float = Form(1.0),
-    factor_p: float = Form(1.0),
-    factor_mg: float = Form(1.0),
-    factor_b: float = Form(1.0),
-    factor_ca: float = Form(1.0),
-    factor_zn: float = Form(1.0),
-    factor_mn: float = Form(1.0),
-):
-    factores = {
-        "n": factor_n, "k": factor_k, "p": factor_p, "mg": factor_mg,
-        "b": factor_b, "ca": factor_ca, "zn": factor_zn, "mn": factor_mn,
-    }
-    # Guardar / actualizar el ajuste
+    id_temporada: int,
+    factores: dict,
+) -> None:
+    """Upsert del ajuste y, si ya hay UR para ese cuartel/temporada, la regenera."""
     save_analisis_agronomico(
         id_cuartel=id_cuartel,
-        id_temporada=temporada,
+        id_temporada=id_temporada,
         factores=factores,
         id_responsable=_id_responsable(request),
     )
-    # Si ya hay UR creada, recalcular UR completa (estimacion + vigor + ajuste)
-    ur = get_ur_cuartel(id_cuartel, temporada)
+    ur = get_ur_cuartel(id_cuartel, id_temporada)
     if ur:
-        # Reconstruir desde la estimacion mas reciente
         estimaciones = get_estimaciones_cuartel(id_cuartel)
         if estimaciones:
             est = estimaciones[0]
@@ -404,7 +388,7 @@ def post_analisis_agronomico(
             if vigor:
                 save_unidades_requeridas(
                     id_cuartel=id_cuartel,
-                    id_temporada=temporada,
+                    id_temporada=id_temporada,
                     id_vigor=ur["id_vigor"],
                     id_responsable=_id_responsable(request),
                     especie=est["especie"],
@@ -412,10 +396,82 @@ def post_analisis_agronomico(
                     vigor_factor=float(vigor["factor"]),
                     factores=get_factores_all(),
                 )
-    return RedirectResponse(
-        url=f"/app/unidades/{id_cuartel}?temporada={temporada}",
-        status_code=303,
+
+
+@app.get("/app/ajuste-agronomico", response_class=HTMLResponse)
+def web_ajuste_agronomico(
+    request: Request,
+    temporada: str | None = None,
+    sucursal: str | None = None,
+    especie: str | None = None,
+    variedad: str | None = None,
+    cuartel: int | None = None,
+):
+    temporada_id = _to_int(temporada)
+    sucursal_id = _to_int(sucursal)
+    especie_id = _to_int(especie)
+    variedad_id = _to_int(variedad)
+
+    temporadas = get_temporadas()
+    id_temp = temporada_id or (temporadas[0]["id"] if temporadas else None)
+    id_suc = _id_sucursal(request, sucursal_id)
+
+    especies_disponibles = get_especies(id_sucursal=id_suc)
+    variedades_de_especie = get_variedades(id_especie=especie_id, id_sucursal=id_suc)
+
+    if id_temp:
+        filas = listar_cuarteles_con_ajustes(
+            id_temporada=id_temp,
+            id_sucursal=id_suc,
+            id_especie=especie_id,
+            id_variedad=variedad_id,
+        )
+    else:
+        filas = []
+
+    return templates.TemplateResponse(
+        "ajuste_agronomico.html",
+        {
+            "request": request,
+            "active_page": "ajuste-agronomico",
+            "temporadas": temporadas,
+            "especies": especies_disponibles,
+            "variedades": variedades_de_especie,
+            "filas": filas,
+            "filtro_temporada": id_temp,
+            "filtro_sucursal": id_suc,
+            "filtro_especie": especie_id,
+            "filtro_variedad": variedad_id,
+            "cuartel_destacado": cuartel,
+        },
     )
+
+
+@app.post("/app/ajuste-agronomico/{id_cuartel}")
+def post_ajuste_agronomico_fila(
+    request: Request,
+    id_cuartel: int,
+    temporada: int = Form(...),
+    factor_n: float = Form(1.0),
+    factor_p: float = Form(1.0),
+    factor_k: float = Form(1.0),
+    factor_mg: float = Form(1.0),
+    factor_b: float = Form(1.0),
+    factor_ca: float = Form(1.0),
+    factor_zn: float = Form(1.0),
+    factor_mn: float = Form(1.0),
+):
+    """Autosave por fila desde la tabla de ajuste agronomico. Responde 204."""
+    _aplicar_ajuste_y_regenerar_ur(
+        request,
+        id_cuartel,
+        temporada,
+        {
+            "n": factor_n, "k": factor_k, "p": factor_p, "mg": factor_mg,
+            "b": factor_b, "ca": factor_ca, "zn": factor_zn, "mn": factor_mn,
+        },
+    )
+    return HTMLResponse(status_code=204)
 
 
 @app.get("/app/unidades/{id_cuartel}/preview", response_class=HTMLResponse)

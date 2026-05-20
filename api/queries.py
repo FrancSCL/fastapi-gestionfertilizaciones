@@ -588,6 +588,67 @@ def recalcular_ur_con_ajuste(id_cuartel: int, id_temporada: int) -> bool:
     return True
 
 
+def listar_cuarteles_con_ajustes(
+    id_temporada: int,
+    id_sucursal: int | None = None,
+    id_especie: int | None = None,
+    id_variedad: int | None = None,
+) -> list:
+    """Lista cuarteles que tienen programa en la temporada + factores agronomicos
+    (si existen, sino 1.0 default). Una fila por cuartel."""
+    suc_ph = ",".join(["%s"] * len(SUCURSALES_VISIBLES))
+    where = [f"suc.id IN ({suc_ph})", "prog.id_temporada = %s"]
+    params: list = list(SUCURSALES_VISIBLES) + [id_temporada]
+    if id_sucursal:
+        where.append("suc.id = %s")
+        params.append(id_sucursal)
+    if id_especie:
+        where.append("var.id_especie = %s")
+        params.append(id_especie)
+    if id_variedad:
+        where.append("ceco.id_variedad = %s")
+        params.append(id_variedad)
+    where_sql = "WHERE " + " AND ".join(where)
+    sql = f"""
+        SELECT
+            ceco.id                       AS id_cuartel,
+            ceco.descripcion_ceco         AS cuartel,
+            COALESCE(var.variedad, '—')   AS variedad,
+            COALESCE(esp.especie, '—')    AS especie,
+            ceco.sup_productiva           AS sup_productiva,
+            suc.id                        AS id_sucursal,
+            suc.sucursal                  AS sucursal,
+            COALESCE(aa.factor_n,  1.0)   AS factor_n,
+            COALESCE(aa.factor_p,  1.0)   AS factor_p,
+            COALESCE(aa.factor_k,  1.0)   AS factor_k,
+            COALESCE(aa.factor_mg, 1.0)   AS factor_mg,
+            COALESCE(aa.factor_b,  1.0)   AS factor_b,
+            COALESCE(aa.factor_ca, 1.0)   AS factor_ca,
+            COALESCE(aa.factor_zn, 1.0)   AS factor_zn,
+            COALESCE(aa.factor_mn, 1.0)   AS factor_mn,
+            aa.hora_registro              AS ajuste_hora
+        FROM FACT_AREATECNICA_FERTILIZACION_PROGRAMA prog
+        JOIN DIM_GENERAL_CECO             ceco ON ceco.id = prog.id_cuartel
+        JOIN DIM_GENERAL_SUCURSAL         suc  ON suc.id  = ceco.id_sucursal
+        LEFT JOIN DIM_GENERAL_VARIEDAD    var  ON var.id  = ceco.id_variedad
+        LEFT JOIN DIM_GENERAL_ESPECIE     esp  ON esp.id  = var.id_especie
+        LEFT JOIN FACT_AREATECNICA_FERTILIZACION_ANALISISAGRONOMICO aa
+                  ON aa.id_cuartel = ceco.id AND aa.id_temporada = %s
+        {where_sql}
+        GROUP BY ceco.id, ceco.descripcion_ceco, var.variedad, esp.especie,
+                 ceco.sup_productiva, suc.id, suc.sucursal,
+                 aa.factor_n, aa.factor_p, aa.factor_k, aa.factor_mg,
+                 aa.factor_b, aa.factor_ca, aa.factor_zn, aa.factor_mn,
+                 aa.hora_registro
+        ORDER BY suc.sucursal, ceco.descripcion_ceco
+    """
+    final_params = [id_temporada] + params
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(sql, final_params)
+            return cur.fetchall()
+
+
 def get_cuarteles_con_ajuste_temporada(id_temporada: int) -> set:
     """Set de id_cuartel que tienen al menos un factor != 1.0 para la temporada."""
     sql = """

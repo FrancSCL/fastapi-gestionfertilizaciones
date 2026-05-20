@@ -1,0 +1,165 @@
+{% extends "base.html" %}
+
+{% block title %}Ajuste agronómico{% endblock %}
+{% block topbar_title %}Ajuste agronómico{% endblock %}
+
+{% block content %}
+
+<!-- Filtros -->
+<form method="get" action="/app/ajuste-agronomico" class="filters" id="filtersForm">
+  <div class="filter-group">
+    <label class="filter-label" for="temporada">Temporada</label>
+    <select id="temporada" name="temporada" class="filter-select" onchange="this.form.submit()">
+      {% for t in temporadas %}
+      <option value="{{ t.id }}" {% if filtro_temporada == t.id %}selected{% endif %}>{{ t.temporada }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div class="filter-group">
+    <label class="filter-label" for="especie">Especie</label>
+    <select id="especie" name="especie" class="filter-select"
+            onchange="document.getElementById('variedad').value='';this.form.submit()">
+      <option value="">Todas las especies</option>
+      {% for e in especies %}
+      <option value="{{ e.id }}" {% if filtro_especie == e.id %}selected{% endif %}>{{ e.especie }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div class="filter-group">
+    <label class="filter-label" for="variedad">Variedad</label>
+    <select id="variedad" name="variedad" class="filter-select" onchange="this.form.submit()"
+            {% if not variedades %}disabled{% endif %}>
+      <option value="">Todas las variedades</option>
+      {% for v in variedades %}
+      <option value="{{ v.id }}" {% if filtro_variedad == v.id %}selected{% endif %}>{{ v.variedad }}</option>
+      {% endfor %}
+    </select>
+  </div>
+</form>
+
+<div class="aa-hint">
+  Factor multiplicador por nutriente. <strong>1.00</strong> = sin ajuste,
+  <strong>0.80</strong> = aplicar 80%, <strong>1.20</strong> = aplicar 120%.
+  Los cambios se guardan al salir del campo y se recalculan las UR existentes
+  para el cuartel / temporada.
+</div>
+
+<div class="data-table-wrap aa-wrap">
+  <div class="data-table-header">
+    <h2>Cuarteles con programa</h2>
+    <span class="data-table-count">{{ filas|length }} cuarteles</span>
+  </div>
+
+  {% if filas|length == 0 %}
+  <div class="empty-state" style="padding:var(--sp-6);text-align:center;">
+    <p style="color:var(--text-muted);">No hay cuarteles con programa en la temporada seleccionada.</p>
+  </div>
+  {% else %}
+  <div style="overflow-x:auto;">
+    <table class="aa-table">
+      <thead>
+        <tr>
+          <th class="aa-th-cuartel">Cuartel</th>
+          <th>Sucursal</th>
+          <th>Variedad</th>
+          <th class="num">Sup. ha</th>
+          {% for nut in ['N','P','K','Mg','B','Ca','Zn','Mn'] %}
+          <th class="aa-th-nut">{{ nut }}</th>
+          {% endfor %}
+          <th class="aa-th-meta">Última mod.</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for f in filas %}
+        {% set fila_modif = false %}
+        {% for nut in ['n','p','k','mg','b','ca','zn','mn'] %}
+          {% if (f['factor_' ~ nut] | float) != 1.0 %}{% set fila_modif = true %}{% endif %}
+        {% endfor %}
+        <tr class="aa-row {% if fila_modif %}is-modified{% endif %} {% if cuartel_destacado == f.id_cuartel %}is-highlight{% endif %}"
+            data-id-cuartel="{{ f.id_cuartel }}"
+            id="row-{{ f.id_cuartel }}">
+          <td class="aa-cuartel-name">{{ f.cuartel }}</td>
+          <td><span class="tag tag-sucursal">{{ f.sucursal }}</span></td>
+          <td><span class="tag">{{ f.variedad }}</span></td>
+          <td class="num">{{ '%.2f' | format(f.sup_productiva | float) }}</td>
+
+          <form class="aa-row-form" style="display:contents"
+                hx-post="/app/ajuste-agronomico/{{ f.id_cuartel }}"
+                hx-trigger="change from:input delay:300ms"
+                hx-swap="none"
+                hx-on::after-request="if(event.detail.successful){this.closest('tr').classList.add('is-saved');setTimeout(()=>this.closest('tr').classList.remove('is-saved'),900)}">
+            <input type="hidden" name="temporada" value="{{ filtro_temporada }}">
+            {% for nut in ['n','p','k','mg','b','ca','zn','mn'] %}
+            {% set valor = (f['factor_' ~ nut] | float) %}
+            <td class="aa-td-nut {% if valor != 1.0 %}is-modified{% endif %}" data-nut="{{ nut }}">
+              <input type="number" name="factor_{{ nut }}"
+                     step="0.05" min="0" max="3"
+                     value="{{ '%.2f' | format(valor) }}"
+                     class="aa-input">
+            </td>
+            {% endfor %}
+          </form>
+
+          <td class="aa-meta">
+            {% if f.ajuste_hora %}
+              {{ f.ajuste_hora.strftime('%d/%m %H:%M') }}
+            {% else %}
+              <span style="color:var(--text-muted);font-style:italic;">—</span>
+            {% endif %}
+          </td>
+          <td>
+            <button type="button" class="aa-reset-btn" title="Resetear a 1.00"
+                    onclick="resetRow(this)">↺</button>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+</div>
+
+<script>
+  // Marcar celdas con factor != 1 al editar
+  function refreshCell(input) {
+    const v = parseFloat(input.value) || 1.0;
+    input.closest('td').classList.toggle('is-modified', Math.abs(v - 1.0) > 0.001);
+    // marcar fila también
+    const row = input.closest('tr');
+    const anyMod = Array.from(row.querySelectorAll('.aa-td-nut')).some(
+      td => td.classList.contains('is-modified')
+    );
+    row.classList.toggle('is-modified', anyMod);
+  }
+
+  document.querySelectorAll('.aa-input').forEach(inp => {
+    inp.addEventListener('input', () => refreshCell(inp));
+    inp.addEventListener('change', () => refreshCell(inp));
+  });
+
+  // Reset row
+  function resetRow(btn) {
+    const row = btn.closest('tr');
+    const inputs = row.querySelectorAll('.aa-input');
+    let changed = false;
+    inputs.forEach(i => {
+      if (i.value !== '1.00' && parseFloat(i.value) !== 1) {
+        i.value = '1.00';
+        changed = true;
+      }
+      refreshCell(i);
+    });
+    if (changed) {
+      // Disparar change para que HTMX envie el form
+      inputs[0].dispatchEvent(new Event('change', { bubbles: true }));
+    }
+  }
+
+  // Scroll automatico al cuartel destacado
+  {% if cuartel_destacado %}
+  const row = document.getElementById('row-{{ cuartel_destacado }}');
+  if (row) row.scrollIntoView({behavior: 'smooth', block: 'center'});
+  {% endif %}
+</script>
+{% endblock %}

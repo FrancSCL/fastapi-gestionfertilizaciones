@@ -980,112 +980,167 @@ h4 { font-size: 0.875rem; text-transform: uppercase; letter-spacing: 0.04em; col
   vertical-align: middle;
 }
 
-/* Card de análisis agronómico en /app/unidades */
-.analisis-card { margin-top: var(--sp-4); }
+/* ── Modulo Ajuste agronomico (tabla editable) ─────────────── */
 
-.analisis-badge {
-  display: inline-block;
-  margin-left: var(--sp-3);
-  padding: 2px 8px;
-  background: oklch(0.72 0.14 75);
-  color: white;
-  border-radius: 999px;
-  font-size: 0.6875rem;
-  font-weight: 800;
-  letter-spacing: 0.06em;
-  font-family: 'Anybody', system-ui, sans-serif;
-  vertical-align: middle;
-}
-
-.analisis-hint {
-  margin: var(--sp-3) var(--sp-4);
-  padding: 10px 12px;
+.aa-hint {
+  margin: var(--sp-3) 0;
+  padding: 10px 14px;
   background: var(--lh-50);
   border: 1px solid var(--lh-200);
-  border-radius: 6px;
+  border-radius: 8px;
   font-size: 0.8125rem;
   color: var(--text-secondary);
 }
 
-.analisis-hint strong {
+.aa-hint strong {
   color: var(--lh-900);
   font-variant-numeric: tabular-nums;
 }
 
-.analisis-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-  gap: 8px;
-  padding: 0 var(--sp-4) var(--sp-3);
-}
+.aa-wrap { margin-top: var(--sp-3); }
 
-.analisis-cell {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  padding: 8px 10px;
-  background: white;
-  border: 1.5px solid var(--border);
-  border-radius: 8px;
-  transition: border-color 0.15s, background 0.15s;
-}
-
-.analisis-cell.is-modified {
-  border-color: oklch(0.72 0.14 75);
-  background: oklch(0.97 0.04 75);
-}
-
-.analisis-nut {
-  font-family: 'Anybody', system-ui, sans-serif;
-  font-size: 0.8125rem;
-  font-weight: 800;
-  color: var(--lh-800);
-  letter-spacing: -0.01em;
-}
-
-.analisis-cell.is-modified .analisis-nut {
-  color: oklch(0.40 0.12 60);
-}
-
-.analisis-input-wrap {
-  display: flex;
-  align-items: baseline;
-  gap: 4px;
-}
-
-.analisis-input {
-  flex: 1;
+.aa-table {
   width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 0.8125rem;
+}
+
+.aa-table thead th {
+  background: var(--lh-100);
+  color: var(--lh-900);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  text-align: left;
+  padding: 10px 8px;
+  border-bottom: 2px solid var(--lh-300, var(--lh-200));
+  white-space: nowrap;
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
+
+.aa-table thead th.num { text-align: right; }
+
+.aa-th-nut {
+  text-align: center !important;
+  font-family: 'Anybody', system-ui, sans-serif;
+  font-size: 0.8125rem !important;
+  font-weight: 800 !important;
+  letter-spacing: -0.01em !important;
+  text-transform: none !important;
+  color: var(--lh-800);
+  min-width: 70px;
+}
+
+.aa-th-cuartel { min-width: 200px; }
+.aa-th-meta    { min-width: 110px; }
+
+.aa-table tbody td {
   padding: 6px 8px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+}
+
+.aa-cuartel-name {
+  font-weight: 700;
+  color: var(--lh-900);
+}
+
+.aa-table tbody td.num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-secondary);
+}
+
+.aa-row {
+  transition: background 0.18s;
+}
+
+.aa-row:hover { background: var(--lh-50); }
+
+.aa-row.is-modified {
+  background: oklch(0.98 0.025 75);
+}
+
+.aa-row.is-modified:hover { background: oklch(0.96 0.035 75); }
+
+.aa-row.is-highlight {
+  background: oklch(0.95 0.05 75);
+  outline: 2px solid oklch(0.72 0.14 75);
+  outline-offset: -2px;
+}
+
+.aa-row.is-saved {
+  animation: aa-flash 0.9s ease-out;
+}
+
+@keyframes aa-flash {
+  0%   { background: oklch(0.88 0.10 145); }
+  100% { background: transparent; }
+}
+
+.aa-td-nut {
+  padding: 4px 3px !important;
+  text-align: center;
+  min-width: 70px;
+}
+
+.aa-input {
+  width: 64px;
+  padding: 6px 6px;
   background: white;
   border: 1px solid var(--border);
   border-radius: 5px;
   font-family: inherit;
-  font-size: 0.9rem;
+  font-size: 0.8125rem;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
   color: var(--text-primary);
   text-align: right;
+  transition: border-color 0.15s, background 0.15s, box-shadow 0.15s;
 }
 
-.analisis-input:focus {
+.aa-input:focus {
   outline: none;
   border-color: var(--lh-500);
   box-shadow: 0 0 0 2px oklch(0.52 0.12 145 / 0.15);
 }
 
-.analisis-x {
-  color: var(--text-muted);
-  font-size: 0.75rem;
-  font-weight: 600;
+.aa-td-nut.is-modified .aa-input {
+  border-color: oklch(0.72 0.14 75);
+  background: oklch(0.97 0.04 75);
+  color: oklch(0.30 0.14 50);
 }
 
-.analisis-meta {
-  margin: 0 var(--sp-4) var(--sp-3);
-  font-size: 0.6875rem;
+.aa-meta {
+  font-size: 0.75rem;
   color: var(--text-muted);
-  font-style: italic;
-  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.aa-reset-btn {
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  border-radius: 5px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.aa-reset-btn:hover {
+  background: var(--lh-100);
+  color: var(--lh-800);
+  border-color: var(--lh-400);
 }
 
 .matriz-alert-close {
