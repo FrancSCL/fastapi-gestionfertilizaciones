@@ -649,6 +649,58 @@ def listar_cuarteles_con_ajustes(
             return cur.fetchall()
 
 
+def get_descuento_bodega_semana(
+    etiqueta_semana: str,
+    id_sucursal: int | None = None,
+    id_temporada: int | None = None,
+) -> list:
+    """Devuelve los movimientos de bodega para una semana especifica.
+    Una fila por (sucursal, cuartel, producto) con cantidad total = dosis_ha * sup_productiva.
+    Solo incluye productos con dosis > 0."""
+    suc_ph = ",".join(["%s"] * len(SUCURSALES_VISIBLES))
+    where = [f"suc.id IN ({suc_ph})", "sem.etiqueta_semana = %s", "pp.cantidad_producto > 0"]
+    params: list = list(SUCURSALES_VISIBLES) + [etiqueta_semana]
+    if id_sucursal:
+        where.append("suc.id = %s")
+        params.append(id_sucursal)
+    if id_temporada:
+        where.append("prog.id_temporada = %s")
+        params.append(id_temporada)
+    where_sql = "WHERE " + " AND ".join(where)
+    sql = f"""
+        SELECT
+            sem.etiqueta_semana,
+            sem.fecha_inicio,
+            sem.fecha_fin,
+            suc.id                       AS id_sucursal,
+            suc.sucursal                 AS sucursal,
+            ceco.id                      AS id_cuartel,
+            ceco.descripcion_ceco        AS cuartel,
+            COALESCE(var.variedad, '—')  AS variedad,
+            ceco.sup_productiva          AS sup_productiva,
+            prod.id                      AS id_producto,
+            prod.nombre_comercial        AS producto,
+            prod.codigo_softland         AS codigo_softland,
+            COALESCE(uni.abreviatura, '') AS unidad,
+            pp.cantidad_producto         AS dosis_ha,
+            ROUND(pp.cantidad_producto * ceco.sup_productiva, 2) AS cantidad_total
+        FROM FACT_AREATECNICA_FERTILIZACION_PROGRAMA prog
+        JOIN FACT_AREATECNICA_FERTILIZACION_PRODUCTOSPROGRAMA pp ON pp.id_fertilizacion = prog.id
+        JOIN DIM_AREATECNICA_FITO_PRODUCTO prod ON prod.id = pp.id_producto
+        LEFT JOIN DIM_GENERAL_UNIDAD uni ON uni.id = prod.id_unidad
+        JOIN DIM_GENERAL_CECO        ceco ON ceco.id = prog.id_cuartel
+        JOIN DIM_GENERAL_SUCURSAL    suc  ON suc.id  = ceco.id_sucursal
+        JOIN DIM_GENERAL_SEMANASTEMPORADA sem ON sem.id = prog.semana
+        LEFT JOIN DIM_GENERAL_VARIEDAD var ON var.id = ceco.id_variedad
+        {where_sql}
+        ORDER BY suc.sucursal, ceco.descripcion_ceco, prod.nombre_comercial
+    """
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(sql, params)
+            return cur.fetchall()
+
+
 def get_cuarteles_con_ajuste_temporada(id_temporada: int) -> set:
     """Set de id_cuartel que tienen al menos un factor != 1.0 para la temporada."""
     sql = """

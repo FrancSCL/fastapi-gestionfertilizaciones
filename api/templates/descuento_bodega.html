@@ -1,0 +1,137 @@
+{% extends "base.html" %}
+
+{% block title %}Descuento bodega{% endblock %}
+{% block topbar_title %}Descuento bodega{% endblock %}
+
+{% block topbar_extra %}
+{% if filtro_semana and filas %}
+{% set qs %}temporada={{ filtro_temporada or '' }}&sucursal={{ filtro_sucursal or '' }}&semana={{ filtro_semana }}{% endset %}
+<a href="/app/descuento-bodega/excel?{{ qs }}"
+   class="filter-btn" style="text-decoration:none;margin-left:auto;">
+  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none"
+       stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+       style="vertical-align:-2px;margin-right:4px;">
+    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+    <polyline points="7 10 12 15 17 10"/>
+    <line x1="12" y1="15" x2="12" y2="3"/>
+  </svg>
+  Descargar Excel
+</a>
+{% endif %}
+{% endblock %}
+
+{% block content %}
+
+<form method="get" action="/app/descuento-bodega" class="filters">
+  <div class="filter-group">
+    <label class="filter-label" for="temporada">Temporada</label>
+    <select id="temporada" name="temporada" class="filter-select" onchange="this.form.submit()">
+      {% for t in temporadas %}
+      <option value="{{ t.id }}" {% if filtro_temporada == t.id %}selected{% endif %}>{{ t.temporada }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div class="filter-group">
+    <label class="filter-label" for="semana">Semana</label>
+    <select id="semana" name="semana" class="filter-select" onchange="this.form.submit()">
+      <option value="">— Seleccionar —</option>
+      {% for s in semanas %}
+      <option value="{{ s.etiqueta_semana }}" {% if filtro_semana == s.etiqueta_semana %}selected{% endif %}>
+        {{ s.etiqueta_semana }}{% if s.fecha_inicio %} · {{ s.fecha_inicio.strftime('%d/%m') }} – {{ s.fecha_fin.strftime('%d/%m') }}{% endif %}
+      </option>
+      {% endfor %}
+    </select>
+  </div>
+</form>
+
+{% if not filtro_semana %}
+<div class="empty-state" style="padding:var(--sp-6);text-align:center;">
+  <p style="color:var(--text-muted);">Selecciona una semana para ver el descuento de bodega.</p>
+</div>
+{% elif not filas %}
+<div class="empty-state" style="padding:var(--sp-6);text-align:center;">
+  <p style="color:var(--text-muted);">
+    No hay productos con dosis cargada para
+    <strong style="color:var(--lh-900);">{{ filtro_semana }}</strong>
+    en los filtros seleccionados.
+  </p>
+</div>
+{% else %}
+
+<!-- Resumen consolidado -->
+<div class="data-table-wrap" style="margin-bottom:var(--sp-4);">
+  <div class="data-table-header">
+    <h2>Resumen bodega · {{ filtro_semana }}</h2>
+    <span class="data-table-count">{{ resumen|length }} productos</span>
+  </div>
+  <div style="overflow-x:auto;">
+    <table class="bod-table bod-table-resumen">
+      <thead>
+        <tr>
+          <th>Producto</th>
+          <th>Cód. Softland</th>
+          <th>Unidad</th>
+          <th class="num">Cantidad total</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for p in resumen %}
+        <tr>
+          <td class="bod-prod">{{ p.producto }}</td>
+          <td class="bod-cod {% if not p.codigo_softland %}is-missing{% endif %}">
+            {{ p.codigo_softland or '—' }}
+          </td>
+          <td>{{ p.unidad or '—' }}</td>
+          <td class="num"><strong>{{ '%.2f' | format(p.cantidad_total) }}</strong></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Detalle por cuartel -->
+<div class="data-table-wrap">
+  <div class="data-table-header">
+    <h2>Detalle por cuartel</h2>
+    <span class="data-table-count">{{ filas|length }} movimientos</span>
+  </div>
+  <div style="overflow-x:auto;">
+    <table class="bod-table">
+      <thead>
+        <tr>
+          <th>Sucursal</th>
+          <th>CECO</th>
+          <th>Cuartel</th>
+          <th>Variedad</th>
+          <th class="num">Sup. ha</th>
+          <th>Producto</th>
+          <th>Cód. Softland</th>
+          <th>Unidad</th>
+          <th class="num">Dosis kg/ha</th>
+          <th class="num">Cantidad</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for f in filas %}
+        <tr>
+          <td><span class="tag tag-sucursal">{{ f.sucursal }}</span></td>
+          <td class="bod-ceco">{{ f.id_cuartel }}</td>
+          <td class="bod-cuartel">{{ f.cuartel }}</td>
+          <td><span class="tag">{{ f.variedad }}</span></td>
+          <td class="num">{{ '%.2f' | format(f.sup_productiva | float) }}</td>
+          <td class="bod-prod">{{ f.producto }}</td>
+          <td class="bod-cod {% if not f.codigo_softland %}is-missing{% endif %}">
+            {{ f.codigo_softland or '—' }}
+          </td>
+          <td>{{ f.unidad or '—' }}</td>
+          <td class="num">{{ '%.2f' | format(f.dosis_ha | float) }}</td>
+          <td class="num"><strong>{{ '%.2f' | format(f.cantidad_total | float) }}</strong></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+{% endblock %}

@@ -67,6 +67,17 @@
           Ajuste agronómico
         </a>
 
+        <a href="/app/descuento-bodega"
+           class="nav-item {% if active_page == 'descuento-bodega' %}active{% endif %}">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+               stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3 7l9-4 9 4-9 4-9-4z"/>
+            <path d="M3 12l9 4 9-4"/>
+            <path d="M3 17l9 4 9-4"/>
+          </svg>
+          Descuento bodega
+        </a>
+
         {% if request.session.get('user_rol') == 'admin' %}
         <span class="sidebar-section-label">Configuración</span>
 

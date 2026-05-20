@@ -19,6 +19,7 @@ from .queries import (
     get_analisis_agronomico, save_analisis_agronomico, recalcular_ur_con_ajuste,
     tiene_ajuste_agronomico, get_cuarteles_con_ajuste_temporada,
     listar_cuarteles_con_ajustes,
+    get_descuento_bodega_semana,
     save_vigor, save_factor,
     get_programas_cuartel, get_productos_disponibles,
     agregar_producto_semanas, update_dosis, eliminar_producto_cuartel,
@@ -771,6 +772,175 @@ def generar_papeleta(id_programa: str):
     return Response(
         content=pdf_bytes,
         media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+@app.get("/app/descuento-bodega", response_class=HTMLResponse)
+def web_descuento_bodega(
+    request: Request,
+    temporada: str | None = None,
+    sucursal: str | None = None,
+    semana: str | None = None,
+):
+    temporada_id = _to_int(temporada)
+    sucursal_id = _to_int(sucursal)
+
+    temporadas = get_temporadas()
+    id_temp = temporada_id or (temporadas[0]["id"] if temporadas else None)
+    id_suc = _id_sucursal(request, sucursal_id)
+
+    semanas = get_semanas_disponibles(id_temporada=id_temp, id_sucursal=id_suc)
+    etiqueta_semana = semana or (semanas[0]["etiqueta_semana"] if semanas else None)
+
+    filas = []
+    resumen = []
+    if etiqueta_semana:
+        filas = get_descuento_bodega_semana(
+            etiqueta_semana=etiqueta_semana,
+            id_sucursal=id_suc,
+            id_temporada=id_temp,
+        )
+        agg: dict = {}
+        for f in filas:
+            k = (f["id_producto"], f["producto"], f.get("codigo_softland"), f.get("unidad") or "")
+            agg[k] = agg.get(k, 0.0) + float(f["cantidad_total"] or 0)
+        resumen = [
+            {
+                "id_producto": k[0],
+                "producto": k[1],
+                "codigo_softland": k[2],
+                "unidad": k[3],
+                "cantidad_total": round(v, 2),
+            }
+            for k, v in sorted(agg.items(), key=lambda x: x[0][1])
+        ]
+
+    return templates.TemplateResponse(
+        "descuento_bodega.html",
+        {
+            "request": request,
+            "active_page": "descuento-bodega",
+            "temporadas": temporadas,
+            "semanas": semanas,
+            "filas": filas,
+            "resumen": resumen,
+            "filtro_temporada": id_temp,
+            "filtro_sucursal": id_suc,
+            "filtro_semana": etiqueta_semana,
+        },
+    )
+
+
+@app.get("/app/descuento-bodega/excel")
+def descargar_descuento_bodega_excel(
+    request: Request,
+    temporada: str | None = None,
+    sucursal: str | None = None,
+    semana: str = "",
+):
+    if not semana:
+        raise HTTPException(status_code=400, detail="Falta el parametro 'semana'")
+    temporada_id = _to_int(temporada)
+    sucursal_id = _to_int(sucursal)
+    id_suc = _id_sucursal(request, sucursal_id)
+
+    filas = get_descuento_bodega_semana(
+        etiqueta_semana=semana,
+        id_sucursal=id_suc,
+        id_temporada=temporada_id,
+    )
+
+    from io import BytesIO
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+
+    HDR_FILL = PatternFill("solid", fgColor="2d5a1f")
+    HDR_FONT = Font(bold=True, color="FFFFFF", size=10)
+    ZEBRA = PatternFill("solid", fgColor="F4FAF1")
+    THIN = Side(style="thin", color="C5D9BB")
+    BORDER = Border(left=THIN, right=THIN, top=THIN, bottom=THIN)
+
+    wb = Workbook()
+    ws1 = wb.active
+    ws1.title = "Detalle"
+
+    headers = [
+        "Semana", "Fecha inicio", "Fecha fin",
+        "Sucursal", "Cuartel (CECO id)", "Cuartel", "Variedad",
+        "Sup. ha", "Producto", "Cód. Softland", "Unidad",
+        "Dosis kg/ha", "Cantidad total",
+    ]
+    ws1.append(headers)
+    for cell in ws1[1]:
+        cell.fill = HDR_FILL
+        cell.font = HDR_FONT
+        cell.alignment = Alignment(horizontal="left", vertical="center")
+        cell.border = BORDER
+
+    for i, f in enumerate(filas, start=2):
+        ws1.append([
+            f["etiqueta_semana"],
+            f["fecha_inicio"],
+            f["fecha_fin"],
+            f["sucursal"],
+            f["id_cuartel"],
+            f["cuartel"],
+            f["variedad"],
+            float(f["sup_productiva"] or 0),
+            f["producto"],
+            f["codigo_softland"] or "",
+            f["unidad"],
+            float(f["dosis_ha"] or 0),
+            float(f["cantidad_total"] or 0),
+        ])
+        if i % 2 == 0:
+            for cell in ws1[i]:
+                cell.fill = ZEBRA
+        for cell in ws1[i]:
+            cell.border = BORDER
+
+    widths = [16, 12, 12, 22, 18, 32, 22, 9, 32, 16, 8, 13, 14]
+    for col_idx, w in enumerate(widths, start=1):
+        ws1.column_dimensions[ws1.cell(row=1, column=col_idx).column_letter].width = w
+    ws1.freeze_panes = "A2"
+
+    # Hoja 2: resumen consolidado
+    ws2 = wb.create_sheet("Resumen bodega")
+    agg: dict = {}
+    for f in filas:
+        k = (f["producto"], f.get("codigo_softland"), f.get("unidad") or "")
+        agg[k] = agg.get(k, 0.0) + float(f["cantidad_total"] or 0)
+
+    ws2.append(["Producto", "Cód. Softland", "Unidad", "Cantidad total"])
+    for cell in ws2[1]:
+        cell.fill = HDR_FILL
+        cell.font = HDR_FONT
+        cell.alignment = Alignment(horizontal="left", vertical="center")
+        cell.border = BORDER
+
+    for i, (k, v) in enumerate(sorted(agg.items()), start=2):
+        ws2.append([k[0], k[1] or "", k[2], round(v, 2)])
+        if i % 2 == 0:
+            for cell in ws2[i]:
+                cell.fill = ZEBRA
+        for cell in ws2[i]:
+            cell.border = BORDER
+
+    widths2 = [32, 16, 10, 14]
+    for col_idx, w in enumerate(widths2, start=1):
+        ws2.column_dimensions[ws2.cell(row=1, column=col_idx).column_letter].width = w
+    ws2.freeze_panes = "A2"
+
+    buf = BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+
+    safe_sem = semana.replace(" ", "_").replace("/", "-")
+    filename = f"descuento_bodega_{safe_sem}.xlsx"
+    return Response(
+        content=buf.read(),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
 

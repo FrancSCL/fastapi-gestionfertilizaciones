@@ -1143,6 +1143,77 @@ h4 { font-size: 0.875rem; text-transform: uppercase; letter-spacing: 0.04em; col
   border-color: var(--lh-400);
 }
 
+/* ── Modulo Descuento bodega ────────────────────────────────── */
+
+.bod-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 0.8125rem;
+}
+
+.bod-table thead th {
+  background: var(--lh-100);
+  color: var(--lh-900);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  text-align: left;
+  padding: 8px 10px;
+  border-bottom: 2px solid var(--lh-200);
+  white-space: nowrap;
+}
+
+.bod-table thead th.num { text-align: right; }
+
+.bod-table tbody td {
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+}
+
+.bod-table tbody tr:hover { background: var(--lh-50); }
+
+.bod-table tbody td.num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.bod-prod {
+  font-weight: 700;
+  color: var(--lh-900);
+}
+
+.bod-ceco,
+.bod-cod {
+  font-family: 'Courier New', monospace;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+
+.bod-cod.is-missing {
+  color: oklch(0.55 0.18 35);
+  background: oklch(0.96 0.04 75);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-weight: 700;
+}
+
+.bod-cuartel {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.bod-table-resumen tbody td {
+  padding: 8px 12px;
+  background: var(--lh-50);
+}
+
+.bod-table-resumen tbody tr:hover td {
+  background: var(--lh-100);
+}
+
 .matriz-alert-close {
   width: 22px;
   height: 22px;
