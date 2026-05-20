@@ -1,0 +1,39 @@
+<div class="add-producto-form add-semana-form">
+  <form method="post" action="/app/matriz/{{ id_cuartel }}/agregar-semana" id="addSemForm">
+    {% if id_temporada %}<input type="hidden" name="temporada" value="{{ id_temporada }}">{% endif %}
+
+    <div class="add-prod-head" style="margin-bottom:var(--sp-2);">
+      <div style="display:flex;align-items:center;gap:var(--sp-2);flex:1;flex-wrap:wrap;">
+        <label class="filter-label" for="addSemSelect" style="margin:0;">Semana</label>
+        <select name="id_semana" id="addSemSelect" class="filter-select" required style="min-width:220px;">
+          <option value="">— Seleccionar semana —</option>
+          {% for s in semanas %}
+          <option value="{{ s.id }}">
+            {{ s.etiqueta_semana }} · {{ s.fecha_inicio.strftime('%d/%m') }} – {{ s.fecha_fin.strftime('%d/%m') }}
+          </option>
+          {% endfor %}
+        </select>
+
+        <label class="filter-label" for="addSemEtapa" style="margin:0;">Etapa</label>
+        <select name="etapa" id="addSemEtapa" class="filter-select" required>
+          <option value="PRECOSECHA" selected>PRECOSECHA</option>
+          <option value="POSTCOSECHA">POSTCOSECHA</option>
+        </select>
+      </div>
+    </div>
+
+    {% if not semanas %}
+    <p class="add-prod-nomatch" style="margin:var(--sp-2) 0;">
+      Todas las semanas de la temporada ya están en el programa.
+    </p>
+    {% endif %}
+
+    <div class="add-prod-actions" style="padding-top:0;border:none;">
+      <button type="button" class="filter-btn filter-btn-ghost"
+              onclick="document.getElementById('add-prod-panel').innerHTML=''">Cancelar</button>
+      <button type="submit" class="filter-btn add-prod-submit" {% if not semanas %}disabled{% endif %}>
+        Agregar semana
+      </button>
+    </div>
+  </form>
+</div>

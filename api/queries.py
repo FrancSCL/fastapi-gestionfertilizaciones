@@ -673,6 +673,120 @@ def update_dosis(id_programa: str, id_producto: int, dosis: float) -> None:
         conn.commit()
 
 
+def get_semanas_disponibles_cuartel(id_cuartel: int, id_temporada: int) -> list:
+    """Semanas de la temporada que aun no estan en el programa del cuartel."""
+    sql = """
+        SELECT sem.id, sem.etiqueta_semana, sem.semana_calendario,
+               sem.anio_calendario, sem.fecha_inicio, sem.fecha_fin
+        FROM DIM_GENERAL_SEMANASTEMPORADA sem
+        WHERE sem.temporada = %s
+          AND sem.id NOT IN (
+              SELECT prog.semana
+              FROM FACT_AREATECNICA_FERTILIZACION_PROGRAMA prog
+              WHERE prog.id_cuartel = %s
+                AND prog.id_temporada = %s
+          )
+        ORDER BY sem.fecha_inicio
+    """
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(sql, (str(id_temporada), id_cuartel, id_temporada))
+            return cur.fetchall()
+
+
+def agregar_semana_programa(id_cuartel: int, id_temporada: int, id_semana: int,
+                             etapa: str, id_responsable: int) -> str:
+    """Crea una fila en PROGRAMA y replica los productos ya existentes en otras
+    semanas del mismo cuartel/temporada con dosis 0. Retorna el id del programa
+    creado. Si ya existe la combinacion (cuartel, semana, temporada), retorna el id
+    existente sin duplicar."""
+    from datetime import datetime
+    id_programa = f"{id_cuartel}{id_semana}"
+
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            # Si ya existe la semana en el programa, no insertar
+            cur.execute(
+                """SELECT id FROM FACT_AREATECNICA_FERTILIZACION_PROGRAMA
+                   WHERE id_cuartel = %s AND id_temporada = %s AND semana = %s
+                   LIMIT 1""",
+                (id_cuartel, id_temporada, str(id_semana)),
+            )
+            existing = cur.fetchone()
+            if existing:
+                return existing["id"]
+
+            # Obtener fechas de la semana
+            cur.execute(
+                "SELECT fecha_inicio, fecha_fin FROM DIM_GENERAL_SEMANASTEMPORADA WHERE id = %s",
+                (id_semana,),
+            )
+            sem = cur.fetchone()
+            if not sem:
+                raise ValueError(f"Semana {id_semana} no existe")
+            fi, ff = sem["fecha_inicio"], sem["fecha_fin"]
+
+            # INSERT en PROGRAMA
+            cur.execute(
+                """INSERT INTO FACT_AREATECNICA_FERTILIZACION_PROGRAMA
+                   (id, id_responsable, id_temporada, id_cuartel, hora_registro,
+                    semana, fecha_inicio, fecha_termino, etapa)
+                   VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)""",
+                (
+                    id_programa,
+                    id_responsable,
+                    id_temporada,
+                    id_cuartel,
+                    datetime.now(),
+                    str(id_semana),
+                    fi,
+                    ff,
+                    etapa,
+                ),
+            )
+
+            # Replicar productos ya asignados al cuartel con dosis 0
+            cur.execute(
+                """SELECT DISTINCT pp.id_producto
+                   FROM FACT_AREATECNICA_FERTILIZACION_PRODUCTOSPROGRAMA pp
+                   JOIN FACT_AREATECNICA_FERTILIZACION_PROGRAMA prog
+                     ON prog.id = pp.id_fertilizacion
+                   WHERE prog.id_cuartel = %s AND prog.id_temporada = %s
+                     AND prog.id <> %s""",
+                (id_cuartel, id_temporada, id_programa),
+            )
+            productos = [r["id_producto"] for r in cur.fetchall()]
+
+            if productos:
+                import uuid as _uuid
+                for pid in productos:
+                    cur.execute(
+                        """INSERT INTO FACT_AREATECNICA_FERTILIZACION_PRODUCTOSPROGRAMA
+                           (id, id_fertilizacion, id_producto, cantidad_producto,
+                            unidades_n, unidades_k, unidades_p, unidades_mg,
+                            unidades_b, unidades_ca, unidades_zn, unidades_mn)
+                           VALUES (%s, %s, %s, 0, 0, 0, 0, 0, 0, 0, 0, 0)""",
+                        (str(_uuid.uuid4())[:45], id_programa, pid),
+                    )
+        conn.commit()
+    return id_programa
+
+
+def eliminar_semana_programa(id_programa: str) -> None:
+    """Elimina una fila de PROGRAMA y todas sus dosis asociadas en PRODUCTOSPROGRAMA."""
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "DELETE FROM FACT_AREATECNICA_FERTILIZACION_PRODUCTOSPROGRAMA WHERE id_fertilizacion = %s",
+                (id_programa,),
+            )
+            cur.execute(
+                "DELETE FROM FACT_AREATECNICA_FERTILIZACION_PROGRAMA WHERE id = %s",
+                (id_programa,),
+            )
+        conn.commit()
+
+
 def eliminar_producto_cuartel(ids_programa: list, id_producto: int) -> int:
     if not ids_programa:
         return 0

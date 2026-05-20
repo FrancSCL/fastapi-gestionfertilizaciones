@@ -13,6 +13,12 @@
       {% endfor %}
     </select>
   </form>
+  <button class="filter-btn filter-btn-ghost"
+          hx-get="/app/matriz/{{ cuartel.id }}/semanas-disponibles{% if filtro_temporada %}?temporada={{ filtro_temporada }}{% endif %}"
+          hx-target="#add-prod-panel"
+          hx-swap="innerHTML">
+    + Semana
+  </button>
   {% if matriz.semanas %}
   <button class="filter-btn filter-btn-ghost"
           hx-get="/app/matriz/{{ cuartel.id }}/productos-disponibles{% if filtro_temporada %}?temporada={{ filtro_temporada }}{% endif %}"
@@ -176,7 +182,17 @@
           {% for fila in matriz.filas %}
           <tr>
             <th class="matriz-semana">
-              <div class="matriz-semana-label">{{ fila.semana.etiqueta }}</div>
+              <div class="matriz-semana-head">
+                <div class="matriz-semana-label">{{ fila.semana.etiqueta }}</div>
+                <form method="post"
+                      action="/app/matriz/{{ cuartel.id }}/eliminar-semana{% if filtro_temporada %}?temporada={{ filtro_temporada }}{% endif %}"
+                      onsubmit="return confirm('¿Quitar la semana {{ fila.semana.etiqueta }} del programa? Se borran sus dosis. Esta acción no se puede deshacer.');"
+                      class="matriz-semana-delete">
+                  <input type="hidden" name="id_programa" value="{{ fila.semana.id_programa }}">
+                  {% if filtro_temporada %}<input type="hidden" name="temporada" value="{{ filtro_temporada }}">{% endif %}
+                  <button type="submit" class="matriz-semana-delete-btn" title="Quitar semana del programa">×</button>
+                </form>
+              </div>
               {% if fila.semana.fecha_inicio and fila.semana.fecha_fin %}
               <div class="matriz-week-dates">
                 {{ fila.semana.fecha_inicio.strftime('%d/%m') }} – {{ fila.semana.fecha_fin.strftime('%d/%m') }}

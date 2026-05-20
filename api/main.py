@@ -19,6 +19,7 @@ from .queries import (
     save_vigor, save_factor,
     get_programas_cuartel, get_productos_disponibles,
     agregar_producto_semanas, update_dosis, eliminar_producto_cuartel,
+    get_semanas_disponibles_cuartel, agregar_semana_programa, eliminar_semana_programa,
     get_productos_lista, get_unidades_lista, save_producto, update_producto_nutrientes,
     get_papeleta_campo_rows, get_cuarteles_huerfanos, get_sucursal_info, get_semana_info,
     validar_login,
@@ -437,6 +438,58 @@ def guardar_dosis(
 ):
     update_dosis(id_programa, id_producto, dosis)
     return HTMLResponse(f'<span class="celda-saved">{dosis:.0f}</span>', status_code=200)
+
+
+@app.get("/app/matriz/{id_cuartel}/semanas-disponibles", response_class=HTMLResponse)
+def semanas_disponibles_fragment(
+    request: Request,
+    id_cuartel: int,
+    temporada: int | None = None,
+):
+    temporadas = get_temporadas()
+    id_temp = temporada or (temporadas[0]["id"] if temporadas else None)
+    semanas = get_semanas_disponibles_cuartel(id_cuartel, id_temp) if id_temp else []
+    return templates.TemplateResponse(
+        "fragment_semanas_select.html",
+        {
+            "request": request,
+            "id_cuartel": id_cuartel,
+            "id_temporada": id_temp,
+            "semanas": semanas,
+        },
+    )
+
+
+@app.post("/app/matriz/{id_cuartel}/agregar-semana")
+def agregar_semana(
+    request: Request,
+    id_cuartel: int,
+    id_semana: int = Form(...),
+    etapa: str = Form("PRECOSECHA"),
+    temporada: int = Form(...),
+):
+    agregar_semana_programa(
+        id_cuartel=id_cuartel,
+        id_temporada=temporada,
+        id_semana=id_semana,
+        etapa=etapa,
+        id_responsable=_id_responsable(request),
+    )
+    return RedirectResponse(
+        url=f"/app/matriz/{id_cuartel}?temporada={temporada}",
+        status_code=303,
+    )
+
+
+@app.post("/app/matriz/{id_cuartel}/eliminar-semana")
+def eliminar_semana(
+    id_cuartel: int,
+    id_programa: str = Form(...),
+    temporada: int | None = Form(None),
+):
+    eliminar_semana_programa(id_programa)
+    url = f"/app/matriz/{id_cuartel}" + (f"?temporada={temporada}" if temporada else "")
+    return RedirectResponse(url=url, status_code=303)
 
 
 # ── Parámetros ────────────────────────────────────────────────────────────────

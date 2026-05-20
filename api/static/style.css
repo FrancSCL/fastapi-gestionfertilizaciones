@@ -918,6 +918,48 @@ h4 { font-size: 0.875rem; text-transform: uppercase; letter-spacing: 0.04em; col
   line-height: 1.1;
 }
 
+.matriz-semana-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.matriz-semana-delete {
+  margin: 0;
+  padding: 0;
+  line-height: 0;
+}
+
+.matriz-semana-delete-btn {
+  width: 16px;
+  height: 16px;
+  display: grid;
+  place-items: center;
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--text-muted);
+  border-radius: 4px;
+  font-size: 12px;
+  line-height: 1;
+  font-weight: 700;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s, background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.matriz-semana:hover .matriz-semana-delete-btn,
+.matriz-semana-delete-btn:focus {
+  opacity: 1;
+}
+
+.matriz-semana-delete-btn:hover {
+  background: #fee2e2;
+  border-color: #fca5a5;
+  color: #b91c1c;
+  opacity: 1;
+}
+
 .matriz-week-sub {
   font-size: 0.625rem;
   color: var(--text-muted);
