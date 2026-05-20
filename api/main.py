@@ -16,6 +16,8 @@ from .queries import (
     get_cuartel_info, get_semanas_cuartel, get_productos_asignados, build_matriz,
     get_vigores, get_factores_all, get_estimaciones_cuartel,
     get_ur_cuartel, calcular_unidades, save_unidades_requeridas,
+    get_analisis_agronomico, save_analisis_agronomico, recalcular_ur_con_ajuste,
+    tiene_ajuste_agronomico, get_cuarteles_con_ajuste_temporada,
     save_vigor, save_factor,
     get_programas_cuartel, get_productos_disponibles,
     agregar_producto_semanas, update_dosis, eliminar_producto_cuartel,
@@ -228,6 +230,16 @@ def web_programas(
         id_especie=especie_id,
         id_variedad=variedad_id,
     )
+
+    # Marcar cuarteles con ajuste agronomico activo para mostrar icono
+    id_temp_para_ajustes = temporada_id or (temporadas[0]["id"] if temporadas else None)
+    cuarteles_con_ajuste = (
+        get_cuarteles_con_ajuste_temporada(id_temp_para_ajustes)
+        if id_temp_para_ajustes else set()
+    )
+    for c in cuarteles:
+        c["tiene_ajuste"] = c["id_cuartel"] in cuarteles_con_ajuste
+
     grupos = agrupar_por_sucursal(cuarteles)
     semanas = get_semanas_disponibles(id_temporada=temporada_id, id_sucursal=id_suc)
     return templates.TemplateResponse(
@@ -275,6 +287,7 @@ def web_matriz(
     productos_rows = get_productos_asignados(ids_prog)
     matriz = build_matriz(semanas_rows, productos_rows)
     ur = get_ur_cuartel(id_cuartel, id_temp)
+    analisis = get_analisis_agronomico(id_cuartel, id_temp) if id_temp else None
 
     errores = {
         "semana_duplicada": "Esa semana ya estaba en el programa. No se duplicó.",
@@ -289,6 +302,7 @@ def web_matriz(
             "cuartel": cuartel,
             "matriz": matriz,
             "ur": ur,
+            "analisis": analisis,
             "temporadas": temporadas,
             "filtro_temporada": temporada,
             "alert_msg": alert_msg,
@@ -334,7 +348,9 @@ def web_unidades(request: Request, id_cuartel: int, temporada: int | None = None
         raise HTTPException(status_code=404, detail="Cuartel no encontrado")
 
     temporadas = get_temporadas()
+    id_temp = temporada or (temporadas[0]["id"] if temporadas else None)
     estimaciones = get_estimaciones_cuartel(id_cuartel)
+    analisis = get_analisis_agronomico(id_cuartel, id_temp) if id_temp else None
 
     return templates.TemplateResponse(
         "unidades.html",
@@ -346,7 +362,59 @@ def web_unidades(request: Request, id_cuartel: int, temporada: int | None = None
             "vigores": get_vigores(),
             "estimaciones": estimaciones,
             "filtro_temporada": temporada,
+            "analisis": analisis,
         },
+    )
+
+
+@app.post("/app/unidades/{id_cuartel}/analisis-agronomico")
+def post_analisis_agronomico(
+    request: Request,
+    id_cuartel: int,
+    temporada: int = Form(...),
+    factor_n: float = Form(1.0),
+    factor_k: float = Form(1.0),
+    factor_p: float = Form(1.0),
+    factor_mg: float = Form(1.0),
+    factor_b: float = Form(1.0),
+    factor_ca: float = Form(1.0),
+    factor_zn: float = Form(1.0),
+    factor_mn: float = Form(1.0),
+):
+    factores = {
+        "n": factor_n, "k": factor_k, "p": factor_p, "mg": factor_mg,
+        "b": factor_b, "ca": factor_ca, "zn": factor_zn, "mn": factor_mn,
+    }
+    # Guardar / actualizar el ajuste
+    save_analisis_agronomico(
+        id_cuartel=id_cuartel,
+        id_temporada=temporada,
+        factores=factores,
+        id_responsable=_id_responsable(request),
+    )
+    # Si ya hay UR creada, recalcular UR completa (estimacion + vigor + ajuste)
+    ur = get_ur_cuartel(id_cuartel, temporada)
+    if ur:
+        # Reconstruir desde la estimacion mas reciente
+        estimaciones = get_estimaciones_cuartel(id_cuartel)
+        if estimaciones:
+            est = estimaciones[0]
+            vigores = get_vigores()
+            vigor = next((v for v in vigores if v["id"] == ur.get("id_vigor")), None)
+            if vigor:
+                save_unidades_requeridas(
+                    id_cuartel=id_cuartel,
+                    id_temporada=temporada,
+                    id_vigor=ur["id_vigor"],
+                    id_responsable=_id_responsable(request),
+                    especie=est["especie"],
+                    ton_estimadas=float(est["ton_estimadas"]),
+                    vigor_factor=float(vigor["factor"]),
+                    factores=get_factores_all(),
+                )
+    return RedirectResponse(
+        url=f"/app/unidades/{id_cuartel}?temporada={temporada}",
+        status_code=303,
     )
 
 

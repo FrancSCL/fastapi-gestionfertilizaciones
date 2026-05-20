@@ -417,17 +417,23 @@ def get_ur_cuartel(id_cuartel: int, id_temporada: int | None = None) -> dict | N
 
 
 def calcular_unidades(ton_estimadas: float, vigor_factor: float,
-                      especie: str, factores: list) -> dict:
+                      especie: str, factores: list,
+                      ajuste_agronomico: dict | None = None) -> dict:
     """UR por nutriente. Por regla de gerencia, el vigor solo afecta al N;
     el resto de los nutrientes se calculan sin ajustar por vigor.
+
+    Si `ajuste_agronomico` viene poblado (dict con claves N,K,P,Mg,B,Ca,Zn,Mn),
+    cada UR se multiplica por su factor correspondiente (default 1.0).
     """
     col = _col_especie(especie)
     resultado = {}
+    aj = ajuste_agronomico or {}
     for f in factores:
         fert = f["fertilizante"]
         factor_esp = float(f[col] or 0)
         vigor = vigor_factor if (fert or "").upper() == "N" else 1.0
-        resultado[fert] = round(ton_estimadas * vigor * factor_esp, 2)
+        ajuste = float(aj.get(fert, aj.get((fert or "").upper(), 1.0)))
+        resultado[fert] = round(ton_estimadas * vigor * factor_esp * ajuste, 2)
     return resultado
 
 
@@ -437,7 +443,13 @@ def save_unidades_requeridas(id_cuartel: int, id_temporada: int, id_vigor: int,
                               factores: list) -> None:
     import uuid
     from datetime import datetime
-    unidades = calcular_unidades(ton_estimadas, vigor_factor, especie, factores)
+    # Si hay ajuste agronomico cargado para el cuartel/temporada, aplicarlo
+    ajuste = get_analisis_agronomico(id_cuartel, id_temporada)
+    aj_dict = None
+    if ajuste:
+        aj_dict = {nut: float(ajuste.get(f"factor_{nut.lower()}", 1.0))
+                   for nut in ("N", "K", "P", "Mg", "B", "Ca", "Zn", "Mn")}
+    unidades = calcular_unidades(ton_estimadas, vigor_factor, especie, factores, aj_dict)
 
     sql = """
         INSERT INTO FACT_AREATECNICA_FERTILIZACION_UNIDADESREQUERIDAS
@@ -467,6 +479,128 @@ def save_unidades_requeridas(id_cuartel: int, id_temporada: int, id_vigor: int,
         with conn.cursor() as cur:
             cur.execute(sql, vals)
         conn.commit()
+
+
+# ── Análisis agronómico (factores por cuartel/temporada/nutriente) ──────────
+
+_FACTORES_NUT = ("n", "k", "p", "mg", "b", "ca", "zn", "mn")
+
+
+def get_analisis_agronomico(id_cuartel: int, id_temporada: int) -> dict | None:
+    sql = """
+        SELECT * FROM FACT_AREATECNICA_FERTILIZACION_ANALISISAGRONOMICO
+        WHERE id_cuartel = %s AND id_temporada = %s
+        LIMIT 1
+    """
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(sql, (id_cuartel, id_temporada))
+            return cur.fetchone()
+
+
+def tiene_ajuste_agronomico(id_cuartel: int, id_temporada: int) -> bool:
+    """True si existe un registro con al menos un factor != 1.0."""
+    fila = get_analisis_agronomico(id_cuartel, id_temporada)
+    if not fila:
+        return False
+    for nut in _FACTORES_NUT:
+        v = float(fila.get(f"factor_{nut}", 1.0) or 1.0)
+        if abs(v - 1.0) > 0.0001:
+            return True
+    return False
+
+
+def save_analisis_agronomico(id_cuartel: int, id_temporada: int,
+                             factores: dict, id_responsable: int) -> None:
+    """UPSERT del registro de ajuste agronomico para el cuartel/temporada.
+    factores = {'n': 0.8, 'k': 1.0, ...} (faltantes -> 1.0)."""
+    import uuid
+    from datetime import datetime
+    valores = {nut: float(factores.get(nut, 1.0) or 1.0) for nut in _FACTORES_NUT}
+
+    sql_check = """
+        SELECT id FROM FACT_AREATECNICA_FERTILIZACION_ANALISISAGRONOMICO
+        WHERE id_cuartel = %s AND id_temporada = %s LIMIT 1
+    """
+    sql_update = """
+        UPDATE FACT_AREATECNICA_FERTILIZACION_ANALISISAGRONOMICO
+           SET factor_n=%s, factor_k=%s, factor_p=%s, factor_mg=%s,
+               factor_b=%s, factor_ca=%s, factor_zn=%s, factor_mn=%s,
+               id_responsable=%s, hora_registro=%s
+         WHERE id = %s
+    """
+    sql_insert = """
+        INSERT INTO FACT_AREATECNICA_FERTILIZACION_ANALISISAGRONOMICO
+            (id, id_cuartel, id_temporada, id_responsable, hora_registro,
+             factor_n, factor_k, factor_p, factor_mg,
+             factor_b, factor_ca, factor_zn, factor_mn)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+    """
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(sql_check, (id_cuartel, id_temporada))
+            existing = cur.fetchone()
+            now = datetime.now()
+            vals_fact = (
+                valores["n"], valores["k"], valores["p"], valores["mg"],
+                valores["b"], valores["ca"], valores["zn"], valores["mn"],
+            )
+            if existing:
+                cur.execute(sql_update, (*vals_fact, id_responsable, now, existing["id"]))
+            else:
+                cur.execute(sql_insert, (
+                    str(uuid.uuid4()), id_cuartel, id_temporada, id_responsable, now,
+                    *vals_fact,
+                ))
+        conn.commit()
+
+
+def recalcular_ur_con_ajuste(id_cuartel: int, id_temporada: int) -> bool:
+    """Aplica los factores agronomicos vigentes a la UR existente del cuartel/temporada
+    (multiplica los valores ya guardados). Asume que la UR actual está SIN aplicar el
+    nuevo ajuste; para reaplicar conviene primero revertir el ajuste anterior."""
+    ajuste = get_analisis_agronomico(id_cuartel, id_temporada)
+    if not ajuste:
+        return False
+    ur = get_ur_cuartel(id_cuartel, id_temporada)
+    if not ur:
+        return False
+
+    sql = """
+        UPDATE FACT_AREATECNICA_FERTILIZACION_UNIDADESREQUERIDAS
+           SET unidades_N=%s, unidades_K=%s, unidades_P=%s, unidades_Mg=%s,
+               unidades_B=%s, unidades_Ca=%s, unidades_Zn=%s, unidades_Mn=%s
+         WHERE id = %s
+    """
+    nuevos = []
+    for nut, col_ur in [
+        ("n", "unidades_N"), ("k", "unidades_K"), ("p", "unidades_P"),
+        ("mg", "unidades_Mg"), ("b", "unidades_B"), ("ca", "unidades_Ca"),
+        ("zn", "unidades_Zn"), ("mn", "unidades_Mn"),
+    ]:
+        valor_actual = float(ur.get(col_ur) or 0)
+        factor = float(ajuste.get(f"factor_{nut}", 1.0) or 1.0)
+        nuevos.append(round(valor_actual * factor, 2))
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(sql, (*nuevos, ur["id"]))
+        conn.commit()
+    return True
+
+
+def get_cuarteles_con_ajuste_temporada(id_temporada: int) -> set:
+    """Set de id_cuartel que tienen al menos un factor != 1.0 para la temporada."""
+    sql = """
+        SELECT id_cuartel FROM FACT_AREATECNICA_FERTILIZACION_ANALISISAGRONOMICO
+        WHERE id_temporada = %s
+          AND (factor_n  <> 1.0 OR factor_k  <> 1.0 OR factor_p  <> 1.0
+            OR factor_mg <> 1.0 OR factor_b  <> 1.0 OR factor_ca <> 1.0
+            OR factor_zn <> 1.0 OR factor_mn <> 1.0)
+    """
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(sql, (id_temporada,))
+            return {r["id_cuartel"] for r in cur.fetchall()}
 
 
 # ── Parámetros: CRUD vigor y factores ────────────────────────────────────────

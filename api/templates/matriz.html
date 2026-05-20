@@ -155,6 +155,25 @@
         <span class="costo-val" data-costo-sup>{{ '%.2f' | format(usd_sup_total) }}</span><span class="costo-unit">USD</span>
       </span>
       {% endif %}
+
+      {% if analisis %}
+      {% set tags_ajuste = [] %}
+      {% for nut, lbl in [('n','N'),('p','P'),('k','K'),('mg','Mg'),('b','B'),('ca','Ca'),('zn','Zn'),('mn','Mn')] %}
+        {% set f = (analisis['factor_' ~ nut] | float) %}
+        {% if f != 1.0 %}{% set _ = tags_ajuste.append(lbl ~ '×' ~ ('%g' | format(f))) %}{% endif %}
+      {% endfor %}
+      {% if tags_ajuste %}
+      <a href="/app/unidades/{{ cuartel.id }}{% if filtro_temporada %}?temporada={{ filtro_temporada }}{% endif %}"
+         class="cuartel-ajuste-badge" title="Click para editar el ajuste agronómico">
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor"
+             stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+        </svg>
+        <span>Ajuste agronómico:</span>
+        <strong>{{ tags_ajuste | join(' · ') }}</strong>
+      </a>
+      {% endif %}
+      {% endif %}
     </div>
 
     <!-- Panel agregar producto (HTMX lo llena) -->

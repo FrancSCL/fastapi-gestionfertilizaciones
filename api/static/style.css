@@ -940,6 +940,154 @@ h4 { font-size: 0.875rem; text-transform: uppercase; letter-spacing: 0.04em; col
   font-weight: 600;
 }
 
+/* ── Ajuste agronómico: badges/iconos ────────────────────────── */
+
+.cuartel-ajuste-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  background: oklch(0.94 0.12 75);
+  border: 1px solid oklch(0.72 0.14 75);
+  color: oklch(0.40 0.12 60);
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-decoration: none;
+  margin-left: var(--sp-3);
+  padding-left: var(--sp-3);
+  border-left: 1px solid var(--border-subtle);
+  transition: background 0.15s, transform 0.1s;
+}
+
+.cuartel-ajuste-badge:hover {
+  background: oklch(0.90 0.14 75);
+  transform: translateY(-1px);
+}
+
+.cuartel-ajuste-badge strong {
+  color: oklch(0.30 0.14 50);
+  font-family: 'Anybody', system-ui, sans-serif;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+
+.cuartel-ajuste-mini {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 6px;
+  color: oklch(0.55 0.14 65);
+  vertical-align: middle;
+}
+
+/* Card de análisis agronómico en /app/unidades */
+.analisis-card { margin-top: var(--sp-4); }
+
+.analisis-badge {
+  display: inline-block;
+  margin-left: var(--sp-3);
+  padding: 2px 8px;
+  background: oklch(0.72 0.14 75);
+  color: white;
+  border-radius: 999px;
+  font-size: 0.6875rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  font-family: 'Anybody', system-ui, sans-serif;
+  vertical-align: middle;
+}
+
+.analisis-hint {
+  margin: var(--sp-3) var(--sp-4);
+  padding: 10px 12px;
+  background: var(--lh-50);
+  border: 1px solid var(--lh-200);
+  border-radius: 6px;
+  font-size: 0.8125rem;
+  color: var(--text-secondary);
+}
+
+.analisis-hint strong {
+  color: var(--lh-900);
+  font-variant-numeric: tabular-nums;
+}
+
+.analisis-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 8px;
+  padding: 0 var(--sp-4) var(--sp-3);
+}
+
+.analisis-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 10px;
+  background: white;
+  border: 1.5px solid var(--border);
+  border-radius: 8px;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.analisis-cell.is-modified {
+  border-color: oklch(0.72 0.14 75);
+  background: oklch(0.97 0.04 75);
+}
+
+.analisis-nut {
+  font-family: 'Anybody', system-ui, sans-serif;
+  font-size: 0.8125rem;
+  font-weight: 800;
+  color: var(--lh-800);
+  letter-spacing: -0.01em;
+}
+
+.analisis-cell.is-modified .analisis-nut {
+  color: oklch(0.40 0.12 60);
+}
+
+.analisis-input-wrap {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+}
+
+.analisis-input {
+  flex: 1;
+  width: 100%;
+  padding: 6px 8px;
+  background: white;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  font-family: inherit;
+  font-size: 0.9rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-primary);
+  text-align: right;
+}
+
+.analisis-input:focus {
+  outline: none;
+  border-color: var(--lh-500);
+  box-shadow: 0 0 0 2px oklch(0.52 0.12 145 / 0.15);
+}
+
+.analisis-x {
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.analisis-meta {
+  margin: 0 var(--sp-4) var(--sp-3);
+  font-size: 0.6875rem;
+  color: var(--text-muted);
+  font-style: italic;
+  text-align: right;
+}
+
 .matriz-alert-close {
   width: 22px;
   height: 22px;
