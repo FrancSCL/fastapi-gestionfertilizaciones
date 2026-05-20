@@ -135,12 +135,21 @@
         {% block topbar_extra %}{% endblock %}
 
         {% if request.state.sucursales_all %}
+        {% if request.state.sucursales_all | length == 1 %}
+        {% set unica = request.state.sucursales_all[0] %}
+        <div class="sucursal-switcher sucursal-switcher-fija">
+          <span class="sucursal-switcher-label">Sucursal</span>
+          <span class="sucursal-switcher-fijo">{{ unica.sucursal }}</span>
+        </div>
+        {% else %}
         <form method="post" action="/set-sucursal" class="sucursal-switcher">
           <input type="hidden" name="next" value="{{ request.url.path }}">
           <label class="sucursal-switcher-label" for="sucursal-select">Sucursal</label>
           <select id="sucursal-select" name="id_sucursal" class="sucursal-switcher-select"
                   onchange="this.form.submit()">
+            {% if request.session.get('user_sucursales') is none %}
             <option value="">Todas</option>
+            {% endif %}
             {% for s in request.state.sucursales_all %}
             <option value="{{ s.id }}"
                     {% if request.state.id_sucursal_activa == s.id %}selected{% endif %}>
@@ -149,6 +158,7 @@
             {% endfor %}
           </select>
         </form>
+        {% endif %}
         {% endif %}
       </header>
 

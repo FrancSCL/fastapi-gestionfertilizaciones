@@ -1348,6 +1348,25 @@ def get_semana_info(etiqueta_semana: str) -> dict | None:
 
 # ══ AUTH ═══════════════════════════════════════════════════════════════════════
 
+def get_sucursales_permitidas(id_usuario: int) -> list:
+    """Lista de id_sucursal autorizados para el usuario. Tolerante a que la
+    tabla z_usuario_sucursal aun no exista (retorna [])."""
+    import pymysql
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            try:
+                cur.execute(
+                    "SELECT id_sucursal FROM z_usuario_sucursal WHERE id_usuario = %s",
+                    (id_usuario,),
+                )
+                return [r["id_sucursal"] for r in cur.fetchall()]
+            except pymysql.err.ProgrammingError as e:
+                # 1146 = tabla no existe
+                if e.args and e.args[0] == 1146:
+                    return []
+                raise
+
+
 def validar_login(usuario: str, contrasena: str) -> dict | None:
     """Valida credenciales. Tolerante a que la columna `rol` aun no exista
     (default 'user')."""

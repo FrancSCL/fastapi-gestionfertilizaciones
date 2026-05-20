@@ -26,7 +26,7 @@ from .queries import (
     get_semanas_disponibles_cuartel, agregar_semana_programa, eliminar_semana_programa,
     get_productos_lista, get_unidades_lista, save_producto, update_producto_nutrientes,
     get_papeleta_campo_rows, get_cuarteles_huerfanos, get_sucursal_info, get_semana_info,
-    validar_login,
+    validar_login, get_sucursales_permitidas,
 )
 from .pdf_service import build_pdf, build_pdf_bodega, build_pdf_campo
 
@@ -65,7 +65,15 @@ class ContextMiddleware(BaseHTTPMiddleware):
                 app.state.sucursales_cache = get_sucursales()
             except Exception:
                 app.state.sucursales_cache = []
-        request.state.sucursales_all = app.state.sucursales_cache
+        # Filtrar segun permisos: None = sin restriccion (admin)
+        permitidas = request.session.get("user_sucursales")
+        if permitidas is None:
+            request.state.sucursales_all = app.state.sucursales_cache
+        else:
+            permitidas_set = set(permitidas)
+            request.state.sucursales_all = [
+                s for s in app.state.sucursales_cache if s["id"] in permitidas_set
+            ]
         return await call_next(request)
 
 
@@ -84,11 +92,28 @@ app.add_middleware(
 
 
 def _id_sucursal(request: Request, query_value: int | None) -> int | None:
-    """Prioridad: query param explicito > sucursal en sesion > None."""
+    """Prioridad: query param explicito > sucursal en sesion > None.
+
+    Si el usuario tiene restriccion (user no-admin con sucursales asignadas),
+    valida que el id resultante este permitido; si no lo esta cae a la primera
+    permitida. Si no eligio ninguna y tiene permisos, fuerza la primera.
+    """
     if query_value is not None:
-        return query_value
-    s = request.session.get("id_sucursal")
-    return int(s) if s else None
+        candidato = query_value
+    else:
+        s = request.session.get("id_sucursal")
+        candidato = int(s) if s else None
+
+    permitidas = request.session.get("user_sucursales")
+    if permitidas is None:
+        return candidato  # admin, sin restriccion
+    permitidas_set = set(permitidas)
+    if not permitidas_set:
+        return candidato  # user sin sucursales asignadas: no restringir (no romper)
+    if candidato is not None and candidato in permitidas_set:
+        return candidato
+    # candidato fuera del set o sin candidato -> primera permitida
+    return next(iter(sorted(permitidas_set)))
 
 
 @app.get("/health")
@@ -133,7 +158,13 @@ def do_login(
     request.session["user_usuario"] = user["usuario"]
     request.session["user_name"] = (nombre + " " + apellido).strip() or user["usuario"]
     request.session["user_initials"] = ((nombre[:1] + apellido[:1]).upper() or user["usuario"][:2].upper())
-    request.session["user_rol"] = user.get("rol") or "user"
+    user_rol = user.get("rol") or "user"
+    request.session["user_rol"] = user_rol
+    # Sucursales permitidas: None para admin (sin restriccion), lista para user
+    if user_rol == "admin":
+        request.session["user_sucursales"] = None
+    else:
+        request.session["user_sucursales"] = get_sucursales_permitidas(user["id"])
     destino = next if next and next.startswith("/") else "/app/programas"
     return RedirectResponse(url=destino, status_code=303)
 
@@ -154,7 +185,11 @@ def set_sucursal(
         request.session.pop("id_sucursal", None)
     else:
         try:
-            request.session["id_sucursal"] = int(id_sucursal)
+            id_int = int(id_sucursal)
+            permitidas = request.session.get("user_sucursales")
+            # Si tiene restriccion y no esta en el set, ignorar
+            if permitidas is None or id_int in set(permitidas):
+                request.session["id_sucursal"] = id_int
         except ValueError:
             pass
     destino = next if next and next.startswith("/") else "/app/programas"
