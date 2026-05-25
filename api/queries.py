@@ -754,6 +754,7 @@ def get_productos_lista() -> list:
             p.id,
             p.nombre_comercial,
             p.codigo_softland,
+            COALESCE(p.precio_usd, 0) AS precio_usd,
             u.abreviatura   AS unidad,
             pn.eficiencia_fertilizante,
             COALESCE(pn.n,  0) AS n,
@@ -787,7 +788,7 @@ def get_unidades_lista() -> list:
 def save_producto(nombre_comercial: str, id_unidad: int, codigo_softland: int | None,
                   n: float, k: float, p: float, mg: float,
                   b: float, ca: float, zn: float, mn: float,
-                  eficiencia: float) -> None:
+                  eficiencia: float, precio_usd: float | None = None) -> None:
     import uuid as _uuid
     id_prod = str(_uuid.uuid4())[:25]
     id_nut  = str(_uuid.uuid4())
@@ -795,9 +796,9 @@ def save_producto(nombre_comercial: str, id_unidad: int, codigo_softland: int | 
         with conn.cursor() as cur:
             cur.execute(
                 """INSERT INTO DIM_AREATECNICA_FITO_PRODUCTO
-                   (id, nombre_comercial, id_unidad, codigo_softland, id_actividad)
-                   VALUES (%s, %s, %s, %s, 5)""",
-                (id_prod, nombre_comercial, id_unidad, codigo_softland or None),
+                   (id, nombre_comercial, id_unidad, codigo_softland, precio_usd, id_actividad)
+                   VALUES (%s, %s, %s, %s, %s, 5)""",
+                (id_prod, nombre_comercial, id_unidad, codigo_softland or None, precio_usd or 0),
             )
             cur.execute(
                 """INSERT INTO DIM_AREATECNICA_FITO_PRODUCTONUTRIENTES
@@ -810,7 +811,10 @@ def save_producto(nombre_comercial: str, id_unidad: int, codigo_softland: int | 
 
 def update_producto_nutrientes(id_producto: str, n: float, k: float, p: float,
                                mg: float, b: float, ca: float, zn: float, mn: float,
-                               eficiencia: float) -> None:
+                               eficiencia: float,
+                               precio_usd: float | None = None) -> None:
+    """Actualiza nutrientes + eficiencia. Si precio_usd viene, tambien actualiza
+    el precio en DIM_AREATECNICA_FITO_PRODUCTO."""
     with get_connection() as conn:
         with conn.cursor() as cur:
             cur.execute(
@@ -820,6 +824,11 @@ def update_producto_nutrientes(id_producto: str, n: float, k: float, p: float,
                    WHERE id_producto=%s""",
                 (n, k, p, mg, b, ca, zn, mn, eficiencia, id_producto),
             )
+            if precio_usd is not None:
+                cur.execute(
+                    "UPDATE DIM_AREATECNICA_FITO_PRODUCTO SET precio_usd = %s WHERE id = %s",
+                    (precio_usd, id_producto),
+                )
         conn.commit()
 
 
