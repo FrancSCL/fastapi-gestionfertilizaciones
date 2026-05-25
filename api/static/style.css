@@ -2392,32 +2392,41 @@ h4 { font-size: 0.875rem; text-transform: uppercase; letter-spacing: 0.04em; col
   min-height: 100vh;
   font-family: 'Archivo', system-ui, sans-serif;
   color: var(--text-primary);
-  background: oklch(0.20 0.05 145);
+  background:
+    radial-gradient(ellipse 80% 60% at 20% 15%, oklch(0.45 0.13 145 / 0.55) 0%, transparent 60%),
+    radial-gradient(ellipse 70% 50% at 85% 85%, oklch(0.65 0.16 100 / 0.32) 0%, transparent 55%),
+    linear-gradient(135deg, oklch(0.22 0.06 145) 0%, oklch(0.16 0.05 150) 100%);
   overflow: hidden;
   position: relative;
 }
 
-/* Ken Burns: imagen en pseudo-elemento para poder transformar */
+/* Pattern SVG vectorial sutil: no se pixelea a ningun zoom */
 .login-body::before {
   content: '';
   position: fixed;
-  inset: -4%;
-  background: url('/static/login.jpg') center/cover no-repeat;
-  transform: scale(1);
-  animation: kenBurns 24s ease-in-out infinite alternate;
+  inset: 0;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160' viewBox='0 0 160 160'><g fill='none' stroke='%2386a884' stroke-width='1.1' opacity='0.14'><path d='M20 40 Q40 10 60 40 T100 40'/><path d='M60 110 Q80 80 100 110 T140 110'/><circle cx='130' cy='30' r='2.5'/><circle cx='30' cy='120' r='2'/><path d='M0 80 Q20 60 40 80'/></g></svg>");
+  background-size: 160px 160px;
+  animation: bgDrift 60s linear infinite;
   z-index: 0;
+  pointer-events: none;
 }
 
-/* Fade-in inicial del fondo */
+/* Fade-in inicial */
 .login-body::after {
   content: '';
   position: fixed;
   inset: 0;
-  background: oklch(0.15 0.05 145);
+  background: oklch(0.14 0.05 145);
   opacity: 1;
   animation: bgReveal 900ms var(--ease-out-quart) forwards;
   z-index: 1;
   pointer-events: none;
+}
+
+@keyframes bgDrift {
+  0%   { background-position: 0 0; }
+  100% { background-position: 160px 160px; }
 }
 
 .login-shell {
@@ -2427,7 +2436,6 @@ h4 { font-size: 0.875rem; text-transform: uppercase; letter-spacing: 0.04em; col
   display: grid;
   place-items: center;
   padding: var(--sp-5);
-  background: linear-gradient(135deg, oklch(0.20 0.05 145 / 0.45) 0%, oklch(0.30 0.08 145 / 0.35) 100%);
 }
 
 .login-card {
@@ -2485,11 +2493,6 @@ h4 { font-size: 0.875rem; text-transform: uppercase; letter-spacing: 0.04em; col
 
 @keyframes itemIn {
   to { opacity: 1; transform: translateY(0); }
-}
-
-@keyframes kenBurns {
-  0%   { transform: scale(1) translate(0, 0); }
-  100% { transform: scale(1.12) translate(-1.5%, 1%); }
 }
 
 @keyframes bgReveal {
