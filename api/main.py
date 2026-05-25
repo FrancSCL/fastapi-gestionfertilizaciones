@@ -444,6 +444,7 @@ def web_ajuste_agronomico(
     variedad: str | None = None,
     cuartel: int | None = None,
 ):
+    _require_admin(request)
     temporada_id = _to_int(temporada)
     sucursal_id = _to_int(sucursal)
     especie_id = _to_int(especie)
@@ -498,7 +499,8 @@ def post_ajuste_agronomico_fila(
     factor_zn: float = Form(1.0),
     factor_mn: float = Form(1.0),
 ):
-    """Autosave por fila desde la tabla de ajuste agronomico. Responde 204."""
+    """Autosave por fila desde la tabla de ajuste nutricional. Responde 204."""
+    _require_admin(request)
     _aplicar_ajuste_y_regenerar_ur(
         request,
         id_cuartel,
@@ -992,6 +994,7 @@ def web_adquisiciones(
     semana_desde: str | None = None,
     semana_hasta: str | None = None,
 ):
+    _require_admin(request)
     temporada_id = _to_int(temporada)
     sucursal_id = _to_int(sucursal)
     semana_desde_id = _to_int(semana_desde)
@@ -1045,6 +1048,7 @@ def descargar_adquisiciones_excel(
     semana_desde: str | None = None,
     semana_hasta: str | None = None,
 ):
+    _require_admin(request)
     temporada_id = _to_int(temporada)
     sucursal_id = _to_int(sucursal)
     semana_desde_id = _to_int(semana_desde)

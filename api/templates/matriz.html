@@ -164,12 +164,12 @@
       {% endfor %}
       {% if tags_ajuste %}
       <a href="/app/ajuste-agronomico?cuartel={{ cuartel.id }}{% if filtro_temporada %}&temporada={{ filtro_temporada }}{% endif %}"
-         class="cuartel-ajuste-badge" title="Click para editar el ajuste agronómico">
+         class="cuartel-ajuste-badge" title="Click para editar el ajuste nutricional">
         <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor"
              stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
         </svg>
-        <span>Ajuste agronómico:</span>
+        <span>Ajuste nutricional:</span>
         <strong>{{ tags_ajuste | join(' · ') }}</strong>
       </a>
       {% endif %}
