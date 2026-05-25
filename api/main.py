@@ -20,6 +20,7 @@ from .queries import (
     tiene_ajuste_agronomico, get_cuarteles_con_ajuste_temporada,
     listar_cuarteles_con_ajustes,
     get_descuento_bodega_semana,
+    get_adquisiciones_consolidado, get_semanas_temporada,
     save_vigor, save_factor,
     get_programas_cuartel, get_productos_disponibles,
     agregar_producto_semanas, update_dosis, eliminar_producto_cuartel,
@@ -976,6 +977,180 @@ def descargar_descuento_bodega_excel(
 
     safe_sem = semana.replace(" ", "_").replace("/", "-")
     filename = f"descuento_bodega_{safe_sem}.xlsx"
+    return Response(
+        content=buf.read(),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+@app.get("/app/adquisiciones", response_class=HTMLResponse)
+def web_adquisiciones(
+    request: Request,
+    temporada: str | None = None,
+    sucursal: str | None = None,
+    semana_desde: str | None = None,
+    semana_hasta: str | None = None,
+):
+    temporada_id = _to_int(temporada)
+    sucursal_id = _to_int(sucursal)
+    semana_desde_id = _to_int(semana_desde)
+    semana_hasta_id = _to_int(semana_hasta)
+
+    temporadas = get_temporadas()
+    id_temp = temporada_id or (temporadas[0]["id"] if temporadas else None)
+    id_suc = _id_sucursal(request, sucursal_id)
+
+    semanas = get_semanas_temporada(id_temp) if id_temp else []
+
+    filas = []
+    total_kg = 0.0
+    total_usd = 0.0
+    if id_temp:
+        filas = get_adquisiciones_consolidado(
+            id_temporada=id_temp,
+            id_semana_desde=semana_desde_id,
+            id_semana_hasta=semana_hasta_id,
+            id_sucursal=id_suc,
+        )
+        for f in filas:
+            kg = float(f["cantidad_total"] or 0)
+            f["subtotal_usd"] = round(kg * float(f.get("precio_usd") or 0), 2)
+            total_kg += kg
+            total_usd += f["subtotal_usd"]
+
+    return templates.TemplateResponse(
+        "adquisiciones.html",
+        {
+            "request": request,
+            "active_page": "adquisiciones",
+            "temporadas": temporadas,
+            "semanas": semanas,
+            "filas": filas,
+            "total_kg": round(total_kg, 2),
+            "total_usd": round(total_usd, 2),
+            "filtro_temporada": id_temp,
+            "filtro_sucursal": id_suc,
+            "filtro_semana_desde": semana_desde_id,
+            "filtro_semana_hasta": semana_hasta_id,
+        },
+    )
+
+
+@app.get("/app/adquisiciones/excel")
+def descargar_adquisiciones_excel(
+    request: Request,
+    temporada: str | None = None,
+    sucursal: str | None = None,
+    semana_desde: str | None = None,
+    semana_hasta: str | None = None,
+):
+    temporada_id = _to_int(temporada)
+    sucursal_id = _to_int(sucursal)
+    semana_desde_id = _to_int(semana_desde)
+    semana_hasta_id = _to_int(semana_hasta)
+
+    temporadas = get_temporadas()
+    id_temp = temporada_id or (temporadas[0]["id"] if temporadas else None)
+    id_suc = _id_sucursal(request, sucursal_id)
+    if not id_temp:
+        raise HTTPException(status_code=400, detail="Falta temporada")
+
+    filas = get_adquisiciones_consolidado(
+        id_temporada=id_temp,
+        id_semana_desde=semana_desde_id,
+        id_semana_hasta=semana_hasta_id,
+        id_sucursal=id_suc,
+    )
+
+    from io import BytesIO
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+
+    HDR_FILL = PatternFill("solid", fgColor="2d5a1f")
+    HDR_FONT = Font(bold=True, color="FFFFFF", size=10)
+    TOTAL_FILL = PatternFill("solid", fgColor="b8dca4")
+    TOTAL_FONT = Font(bold=True, color="1a3a10", size=11)
+    ZEBRA = PatternFill("solid", fgColor="F4FAF1")
+    THIN = Side(style="thin", color="C5D9BB")
+    BORDER = Border(left=THIN, right=THIN, top=THIN, bottom=THIN)
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Adquisiciones"
+
+    # Cabecera con metadata del filtro
+    semanas = get_semanas_temporada(id_temp)
+    sem_desde = next((s for s in semanas if s["id"] == semana_desde_id), None)
+    sem_hasta = next((s for s in semanas if s["id"] == semana_hasta_id), None)
+    suc_info = get_sucursal_info(id_suc) if id_suc else None
+    temp_info = next((t for t in temporadas if t["id"] == id_temp), None)
+
+    ws.append(["Resumen de adquisiciones"])
+    ws["A1"].font = Font(bold=True, color="2d5a1f", size=14)
+    ws.append([])
+    ws.append(["Temporada:", temp_info["temporada"] if temp_info else "—"])
+    ws.append(["Sucursal:", suc_info["sucursal"] if suc_info else "Todas"])
+    ws.append([
+        "Rango:",
+        f"{sem_desde['etiqueta_semana'] if sem_desde else 'Desde inicio'} → {sem_hasta['etiqueta_semana'] if sem_hasta else 'Hasta fin'}",
+    ])
+    ws.append([])
+
+    headers = ["Producto", "Cód. Softland", "Unidad", "Cantidad total", "Precio USD/u", "Subtotal USD"]
+    ws.append(headers)
+    row_header = ws.max_row
+    for cell in ws[row_header]:
+        cell.fill = HDR_FILL
+        cell.font = HDR_FONT
+        cell.alignment = Alignment(horizontal="left", vertical="center")
+        cell.border = BORDER
+
+    total_kg = 0.0
+    total_usd = 0.0
+    for f in filas:
+        kg = float(f["cantidad_total"] or 0)
+        precio = float(f.get("precio_usd") or 0)
+        subtotal = round(kg * precio, 2)
+        ws.append([
+            f["producto"],
+            f.get("codigo_softland") or "",
+            f.get("unidad") or "",
+            kg,
+            precio,
+            subtotal,
+        ])
+        total_kg += kg
+        total_usd += subtotal
+        i = ws.max_row
+        if (i - row_header) % 2 == 0:
+            for cell in ws[i]:
+                cell.fill = ZEBRA
+        for cell in ws[i]:
+            cell.border = BORDER
+
+    # Fila TOTAL
+    ws.append(["TOTAL", "", "", round(total_kg, 2), "", round(total_usd, 2)])
+    i = ws.max_row
+    for cell in ws[i]:
+        cell.fill = TOTAL_FILL
+        cell.font = TOTAL_FONT
+        cell.border = BORDER
+
+    widths = [34, 16, 10, 16, 14, 16]
+    for col_idx, w in enumerate(widths, start=1):
+        ws.column_dimensions[ws.cell(row=row_header, column=col_idx).column_letter].width = w
+    ws.freeze_panes = f"A{row_header + 1}"
+
+    buf = BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+
+    rango = ""
+    if sem_desde and sem_hasta:
+        rango = f"_{sem_desde['etiqueta_semana']}_a_{sem_hasta['etiqueta_semana']}".replace(" ", "_")
+    suc_txt = f"_{suc_info['sucursal'].replace(' ', '_')}" if suc_info else ""
+    filename = f"adquisiciones{suc_txt}{rango}.xlsx"
     return Response(
         content=buf.read(),
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",

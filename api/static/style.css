@@ -1225,6 +1225,32 @@ h4 { font-size: 0.875rem; text-transform: uppercase; letter-spacing: 0.04em; col
   background: var(--lh-100);
 }
 
+/* ── Adquisiciones ──────────────────────────────────────────── */
+
+.adq-hint {
+  margin: var(--sp-3) 0;
+  padding: 10px 14px;
+  background: var(--lh-50);
+  border: 1px solid var(--lh-200);
+  border-radius: 8px;
+  font-size: 0.8125rem;
+  color: var(--text-secondary);
+}
+
+.adq-hint strong {
+  color: var(--lh-900);
+  font-weight: 700;
+}
+
+.adq-total-row td {
+  background: oklch(0.85 0.10 145) !important;
+  color: oklch(0.20 0.10 145);
+  font-weight: 800;
+  border-top: 2px solid var(--lh-500);
+  padding: 12px 10px !important;
+  font-size: 0.875rem;
+}
+
 .matriz-alert-close {
   width: 22px;
   height: 22px;

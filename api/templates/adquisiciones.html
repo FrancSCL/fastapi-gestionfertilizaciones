@@ -1,0 +1,115 @@
+{% extends "base.html" %}
+
+{% block title %}Adquisiciones{% endblock %}
+{% block topbar_title %}Adquisiciones{% endblock %}
+
+{% block topbar_extra %}
+{% if filas %}
+{% set qs %}temporada={{ filtro_temporada or '' }}&sucursal={{ filtro_sucursal or '' }}&semana_desde={{ filtro_semana_desde or '' }}&semana_hasta={{ filtro_semana_hasta or '' }}{% endset %}
+<a href="/app/adquisiciones/excel?{{ qs }}"
+   class="filter-btn" style="text-decoration:none;margin-left:auto;">
+  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none"
+       stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+       style="vertical-align:-2px;margin-right:4px;">
+    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+    <polyline points="7 10 12 15 17 10"/>
+    <line x1="12" y1="15" x2="12" y2="3"/>
+  </svg>
+  Descargar Excel
+</a>
+{% endif %}
+{% endblock %}
+
+{% block content %}
+
+<form method="get" action="/app/adquisiciones" class="filters">
+  <div class="filter-group">
+    <label class="filter-label" for="temporada">Temporada</label>
+    <select id="temporada" name="temporada" class="filter-select" onchange="this.form.submit()">
+      {% for t in temporadas %}
+      <option value="{{ t.id }}" {% if filtro_temporada == t.id %}selected{% endif %}>{{ t.temporada }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div class="filter-group">
+    <label class="filter-label" for="semana_desde">Semana desde</label>
+    <select id="semana_desde" name="semana_desde" class="filter-select" onchange="this.form.submit()">
+      <option value="">— Inicio temporada —</option>
+      {% for s in semanas %}
+      <option value="{{ s.id }}" {% if filtro_semana_desde == s.id %}selected{% endif %}>
+        {{ s.etiqueta_semana }}{% if s.fecha_inicio %} · {{ s.fecha_inicio.strftime('%d/%m') }}{% endif %}
+      </option>
+      {% endfor %}
+    </select>
+  </div>
+  <div class="filter-group">
+    <label class="filter-label" for="semana_hasta">Semana hasta</label>
+    <select id="semana_hasta" name="semana_hasta" class="filter-select" onchange="this.form.submit()">
+      <option value="">— Fin temporada —</option>
+      {% for s in semanas %}
+      <option value="{{ s.id }}" {% if filtro_semana_hasta == s.id %}selected{% endif %}>
+        {{ s.etiqueta_semana }}{% if s.fecha_fin %} · {{ s.fecha_fin.strftime('%d/%m') }}{% endif %}
+      </option>
+      {% endfor %}
+    </select>
+  </div>
+</form>
+
+<div class="adq-hint">
+  Cantidad total a comprar para el rango y la sucursal seleccionada.
+  Equivale a la suma de <strong>dosis kg/ha × superficie del cuartel</strong> de cada
+  programa en el periodo. Subtotal USD se calcula con el <strong>precio actual</strong>
+  cargado en la ficha del producto.
+</div>
+
+{% if not filas %}
+<div class="empty-state" style="padding:var(--sp-6);text-align:center;">
+  <p style="color:var(--text-muted);">
+    No hay productos con dosis cargada en los filtros seleccionados.
+  </p>
+</div>
+{% else %}
+<div class="data-table-wrap">
+  <div class="data-table-header">
+    <h2>Productos a adquirir</h2>
+    <span class="data-table-count">{{ filas|length }} productos</span>
+  </div>
+  <div style="overflow-x:auto;">
+    <table class="bod-table">
+      <thead>
+        <tr>
+          <th>Producto</th>
+          <th>Cód. Softland</th>
+          <th>Unidad</th>
+          <th class="num">Cantidad total</th>
+          <th class="num">Precio USD/u</th>
+          <th class="num">Subtotal USD</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for f in filas %}
+        <tr>
+          <td class="bod-prod">{{ f.producto }}</td>
+          <td class="bod-cod {% if not f.codigo_softland %}is-missing{% endif %}">
+            {{ f.codigo_softland or '—' }}
+          </td>
+          <td>{{ f.unidad or '—' }}</td>
+          <td class="num"><strong>{{ '%.2f' | format(f.cantidad_total | float) }}</strong></td>
+          <td class="num">{{ '%.2f' | format(f.precio_usd | float) }}</td>
+          <td class="num"><strong>{{ '%.2f' | format(f.subtotal_usd | float) }}</strong></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+      <tfoot>
+        <tr class="adq-total-row">
+          <td colspan="3">TOTAL</td>
+          <td class="num">{{ '%.2f' | format(total_kg) }}</td>
+          <td></td>
+          <td class="num">{{ '%.2f' | format(total_usd) }} USD</td>
+        </tr>
+      </tfoot>
+    </table>
+  </div>
+</div>
+{% endif %}
+{% endblock %}

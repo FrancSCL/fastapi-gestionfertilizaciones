@@ -701,6 +701,75 @@ def get_descuento_bodega_semana(
             return cur.fetchall()
 
 
+def get_adquisiciones_consolidado(
+    id_temporada: int,
+    id_semana_desde: int | None = None,
+    id_semana_hasta: int | None = None,
+    id_sucursal: int | None = None,
+) -> list:
+    """Resumen agregado de productos a comprar para un rango de semanas.
+    Una fila por producto con la suma de (dosis_ha * sup_productiva) en el rango."""
+    suc_ph = ",".join(["%s"] * len(SUCURSALES_VISIBLES))
+    where = [f"suc.id IN ({suc_ph})", "pp.cantidad_producto > 0", "prog.id_temporada = %s"]
+    params: list = list(SUCURSALES_VISIBLES) + [id_temporada]
+    if id_semana_desde and id_semana_hasta:
+        where.append(
+            "sem.fecha_inicio BETWEEN "
+            "(SELECT fecha_inicio FROM DIM_GENERAL_SEMANASTEMPORADA WHERE id = %s) "
+            "AND "
+            "(SELECT fecha_inicio FROM DIM_GENERAL_SEMANASTEMPORADA WHERE id = %s)"
+        )
+        params.extend([id_semana_desde, id_semana_hasta])
+    elif id_semana_desde:
+        where.append("sem.fecha_inicio >= (SELECT fecha_inicio FROM DIM_GENERAL_SEMANASTEMPORADA WHERE id = %s)")
+        params.append(id_semana_desde)
+    elif id_semana_hasta:
+        where.append("sem.fecha_inicio <= (SELECT fecha_inicio FROM DIM_GENERAL_SEMANASTEMPORADA WHERE id = %s)")
+        params.append(id_semana_hasta)
+    if id_sucursal:
+        where.append("suc.id = %s")
+        params.append(id_sucursal)
+    where_sql = "WHERE " + " AND ".join(where)
+    sql = f"""
+        SELECT
+            prod.id                       AS id_producto,
+            prod.nombre_comercial         AS producto,
+            prod.codigo_softland          AS codigo_softland,
+            COALESCE(uni.abreviatura, '') AS unidad,
+            COALESCE(prod.precio_usd, 0)  AS precio_usd,
+            ROUND(SUM(pp.cantidad_producto * ceco.sup_productiva), 2) AS cantidad_total
+        FROM FACT_AREATECNICA_FERTILIZACION_PROGRAMA prog
+        JOIN FACT_AREATECNICA_FERTILIZACION_PRODUCTOSPROGRAMA pp ON pp.id_fertilizacion = prog.id
+        JOIN DIM_AREATECNICA_FITO_PRODUCTO prod ON prod.id = pp.id_producto
+        LEFT JOIN DIM_GENERAL_UNIDAD uni ON uni.id = prod.id_unidad
+        JOIN DIM_GENERAL_CECO        ceco ON ceco.id = prog.id_cuartel
+        JOIN DIM_GENERAL_SUCURSAL    suc  ON suc.id  = ceco.id_sucursal
+        JOIN DIM_GENERAL_SEMANASTEMPORADA sem ON sem.id = prog.semana
+        {where_sql}
+        GROUP BY prod.id, prod.nombre_comercial, prod.codigo_softland, uni.abreviatura, prod.precio_usd
+        ORDER BY prod.nombre_comercial
+    """
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(sql, params)
+            return cur.fetchall()
+
+
+def get_semanas_temporada(id_temporada: int) -> list:
+    """Todas las semanas de una temporada ordenadas por fecha (no solo las con programa)."""
+    sql = """
+        SELECT id, etiqueta_semana, semana_calendario, anio_calendario,
+               fecha_inicio, fecha_fin
+        FROM DIM_GENERAL_SEMANASTEMPORADA
+        WHERE temporada = %s
+        ORDER BY fecha_inicio
+    """
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(sql, (str(id_temporada),))
+            return cur.fetchall()
+
+
 def get_cuarteles_con_ajuste_temporada(id_temporada: int) -> set:
     """Set de id_cuartel que tienen al menos un factor != 1.0 para la temporada."""
     sql = """
