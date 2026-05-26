@@ -824,6 +824,9 @@ def get_productos_lista() -> list:
             p.nombre_comercial,
             p.codigo_softland,
             COALESCE(p.precio_usd, 0) AS precio_usd,
+            p.id_objetivo,
+            p.id_modo_accion,
+            p.reingreso,
             u.abreviatura   AS unidad,
             pn.eficiencia_fertilizante,
             COALESCE(pn.n,  0) AS n,
@@ -854,10 +857,39 @@ def get_unidades_lista() -> list:
             return cur.fetchall()
 
 
+def get_objetivos() -> list:
+    sql = """
+        SELECT id, objetivo_producto AS nombre
+        FROM DIM_PROD_OBJETIVO
+        WHERE objetivo_producto IS NOT NULL AND objetivo_producto <> ''
+        ORDER BY objetivo_producto
+    """
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(sql)
+            return cur.fetchall()
+
+
+def get_modos_accion() -> list:
+    sql = """
+        SELECT id, moa AS nombre
+        FROM DIM_PROD_MODOACCION
+        WHERE moa IS NOT NULL AND moa <> ''
+        ORDER BY moa
+    """
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(sql)
+            return cur.fetchall()
+
+
 def save_producto(nombre_comercial: str, id_unidad: int, codigo_softland: int | None,
                   n: float, k: float, p: float, mg: float,
                   b: float, ca: float, zn: float, mn: float,
-                  eficiencia: float, precio_usd: float | None = None) -> None:
+                  eficiencia: float, precio_usd: float | None = None,
+                  id_objetivo: str | None = None,
+                  id_modo_accion: str | None = None,
+                  reingreso: int | None = None) -> None:
     import uuid as _uuid
     id_prod = str(_uuid.uuid4())[:25]
     id_nut  = str(_uuid.uuid4())
@@ -867,8 +899,14 @@ def save_producto(nombre_comercial: str, id_unidad: int, codigo_softland: int | 
                 """INSERT INTO DIM_AREATECNICA_FITO_PRODUCTO
                    (id, nombre_comercial, id_unidad, codigo_softland, precio_usd,
                     id_actividad, id_objetivo, id_modo_accion, reingreso)
-                   VALUES (%s, %s, %s, %s, %s, '5', '', '', 0)""",
-                (id_prod, nombre_comercial, id_unidad, codigo_softland or None, precio_usd or 0),
+                   VALUES (%s, %s, %s, %s, %s, '5', %s, %s, %s)""",
+                (
+                    id_prod, nombre_comercial, id_unidad, codigo_softland or None,
+                    precio_usd or 0,
+                    id_objetivo or '',
+                    id_modo_accion or None,
+                    reingreso,
+                ),
             )
             cur.execute(
                 """INSERT INTO DIM_AREATECNICA_FITO_PRODUCTONUTRIENTES
@@ -882,9 +920,13 @@ def save_producto(nombre_comercial: str, id_unidad: int, codigo_softland: int | 
 def update_producto_nutrientes(id_producto: str, n: float, k: float, p: float,
                                mg: float, b: float, ca: float, zn: float, mn: float,
                                eficiencia: float,
-                               precio_usd: float | None = None) -> None:
-    """Actualiza nutrientes + eficiencia. Si precio_usd viene, tambien actualiza
-    el precio en DIM_AREATECNICA_FITO_PRODUCTO."""
+                               precio_usd: float | None = None,
+                               id_objetivo: str | None = None,
+                               id_modo_accion: str | None = None,
+                               reingreso: int | None = None) -> None:
+    """Actualiza nutrientes + eficiencia. Si vienen precio_usd / id_objetivo /
+    id_modo_accion / reingreso, tambien actualiza esos campos en
+    DIM_AREATECNICA_FITO_PRODUCTO en la misma transaccion."""
     with get_connection() as conn:
         with conn.cursor() as cur:
             cur.execute(
@@ -894,10 +936,22 @@ def update_producto_nutrientes(id_producto: str, n: float, k: float, p: float,
                    WHERE id_producto=%s""",
                 (n, k, p, mg, b, ca, zn, mn, eficiencia, id_producto),
             )
+            # Construir UPDATE dinamico del PRODUCTO con los campos que vinieron
+            sets = []
+            vals: list = []
             if precio_usd is not None:
+                sets.append("precio_usd = %s"); vals.append(precio_usd)
+            if id_objetivo is not None:
+                sets.append("id_objetivo = %s"); vals.append(id_objetivo or '')
+            if id_modo_accion is not None:
+                sets.append("id_modo_accion = %s"); vals.append(id_modo_accion or None)
+            if reingreso is not None:
+                sets.append("reingreso = %s"); vals.append(reingreso)
+            if sets:
+                vals.append(id_producto)
                 cur.execute(
-                    "UPDATE DIM_AREATECNICA_FITO_PRODUCTO SET precio_usd = %s WHERE id = %s",
-                    (precio_usd, id_producto),
+                    f"UPDATE DIM_AREATECNICA_FITO_PRODUCTO SET {', '.join(sets)} WHERE id = %s",
+                    vals,
                 )
         conn.commit()
 

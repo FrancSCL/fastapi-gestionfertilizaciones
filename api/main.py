@@ -26,6 +26,7 @@ from .queries import (
     agregar_producto_semanas, update_dosis, eliminar_producto_cuartel,
     get_semanas_disponibles_cuartel, agregar_semana_programa, eliminar_semana_programa,
     get_productos_lista, get_unidades_lista, save_producto, update_producto_nutrientes,
+    get_objetivos, get_modos_accion,
     get_papeleta_campo_rows, get_cuarteles_huerfanos, get_sucursal_info, get_semana_info,
     validar_login, get_sucursales_permitidas,
 )
@@ -739,6 +740,8 @@ def web_productos(request: Request):
             "active_page": "productos",
             "productos": get_productos_lista(),
             "unidades": get_unidades_lista(),
+            "objetivos": get_objetivos(),
+            "modos_accion": get_modos_accion(),
         },
     )
 
@@ -751,6 +754,9 @@ def crear_producto(
     codigo_softland: int | None = Form(None),
     precio_usd: float = Form(0),
     eficiencia: float = Form(100),
+    id_objetivo: str = Form(""),
+    id_modo_accion: str = Form(""),
+    reingreso: str = Form(""),
     n: float = Form(0),
     k: float = Form(0),
     p: float = Form(0),
@@ -762,9 +768,16 @@ def crear_producto(
 ):
     _require_admin(request)
     # UI envia 0-100, BD guarda fracciones 0-1
-    save_producto(nombre_comercial, id_unidad, codigo_softland,
-                  n/100, k/100, p/100, mg/100, b/100, ca/100, zn/100, mn/100,
-                  eficiencia/100, precio_usd=precio_usd)
+    reingreso_int = _to_int(reingreso)
+    save_producto(
+        nombre_comercial, id_unidad, codigo_softland,
+        n/100, k/100, p/100, mg/100, b/100, ca/100, zn/100, mn/100,
+        eficiencia/100,
+        precio_usd=precio_usd,
+        id_objetivo=id_objetivo or None,
+        id_modo_accion=id_modo_accion or None,
+        reingreso=reingreso_int,
+    )
     return RedirectResponse(url="/app/parametros/productos", status_code=303)
 
 
@@ -774,6 +787,9 @@ def editar_nutrientes(
     id_producto: str,
     eficiencia: float = Form(100),
     precio_usd: float = Form(0),
+    id_objetivo: str = Form(""),
+    id_modo_accion: str = Form(""),
+    reingreso: str = Form(""),
     n: float = Form(0),
     k: float = Form(0),
     p: float = Form(0),
@@ -785,11 +801,15 @@ def editar_nutrientes(
 ):
     _require_admin(request)
     # UI envia 0-100, BD guarda fracciones 0-1
+    reingreso_int = _to_int(reingreso)
     update_producto_nutrientes(
         id_producto,
         n/100, k/100, p/100, mg/100, b/100, ca/100, zn/100, mn/100,
         eficiencia/100,
         precio_usd=precio_usd,
+        id_objetivo=id_objetivo,
+        id_modo_accion=id_modo_accion,
+        reingreso=reingreso_int,
     )
     return RedirectResponse(url="/app/parametros/productos", status_code=303)
 
