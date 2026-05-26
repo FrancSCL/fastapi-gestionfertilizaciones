@@ -3030,6 +3030,41 @@ h4 { font-size: 0.875rem; text-transform: uppercase; letter-spacing: 0.04em; col
   margin-bottom: var(--sp-2);
 }
 
+.prod-delete-form {
+  padding: 8px var(--sp-4) var(--sp-3);
+  border-top: 1px solid var(--lh-100);
+  display: flex;
+  justify-content: flex-end;
+  margin: 0;
+}
+
+.prod-delete-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background: transparent;
+  border: 1px solid #fca5a5;
+  color: #b91c1c;
+  border-radius: 6px;
+  font-family: inherit;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.prod-delete-btn:hover {
+  background: #fee2e2;
+  border-color: #ef4444;
+  color: #7f1d1d;
+}
+
+.prod-delete-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .prod-detail-label-small {
   display: block;
   font-size: 0.6875rem;

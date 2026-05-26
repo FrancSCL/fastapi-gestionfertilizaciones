@@ -27,6 +27,7 @@ from .queries import (
     get_semanas_disponibles_cuartel, agregar_semana_programa, eliminar_semana_programa,
     get_productos_lista, get_unidades_lista, save_producto, update_producto_nutrientes,
     get_objetivos, get_modos_accion,
+    existe_producto_por_nombre, eliminar_producto,
     get_papeleta_campo_rows, get_cuarteles_huerfanos, get_sucursal_info, get_semana_info,
     validar_login, get_sucursales_permitidas,
 )
@@ -731,8 +732,19 @@ def post_factor(
 
 
 @app.get("/app/parametros/productos", response_class=HTMLResponse)
-def web_productos(request: Request):
+def web_productos(request: Request, err: str | None = None, ok: str | None = None,
+                  err_detail: str | None = None):
     _require_admin(request)
+    errores = {
+        "duplicado": "Ya existe un fertilizante con ese nombre. No se creó duplicado.",
+        "en_uso": (
+            f"No se puede eliminar: el producto está en uso en "
+            f"{err_detail or '?'} dosis cargadas. Quitalo de la matriz primero."
+        ),
+    }
+    oks = {
+        "eliminado": "Producto eliminado correctamente.",
+    }
     return templates.TemplateResponse(
         "productos.html",
         {
@@ -742,6 +754,8 @@ def web_productos(request: Request):
             "unidades": get_unidades_lista(),
             "objetivos": get_objetivos(),
             "modos_accion": get_modos_accion(),
+            "alert_err": errores.get(err) if err else None,
+            "alert_ok": oks.get(ok) if ok else None,
         },
     )
 
@@ -767,10 +781,16 @@ def crear_producto(
     mn: float = Form(0),
 ):
     _require_admin(request)
+    # Anti-duplicado: si ya existe otro fertilizante con el mismo nombre, no crear
+    if existe_producto_por_nombre(nombre_comercial.strip()):
+        return RedirectResponse(
+            url="/app/parametros/productos?err=duplicado",
+            status_code=303,
+        )
     # UI envia 0-100, BD guarda fracciones 0-1
     reingreso_int = _to_int(reingreso)
     save_producto(
-        nombre_comercial, id_unidad, codigo_softland,
+        nombre_comercial.strip(), id_unidad, codigo_softland,
         n/100, k/100, p/100, mg/100, b/100, ca/100, zn/100, mn/100,
         eficiencia/100,
         precio_usd=precio_usd,
@@ -779,6 +799,18 @@ def crear_producto(
         reingreso=reingreso_int,
     )
     return RedirectResponse(url="/app/parametros/productos", status_code=303)
+
+
+@app.post("/app/parametros/productos/{id_producto}/eliminar")
+def eliminar_producto_endpoint(request: Request, id_producto: str):
+    _require_admin(request)
+    ok, en_uso = eliminar_producto(id_producto)
+    if ok:
+        return RedirectResponse(url="/app/parametros/productos?ok=eliminado", status_code=303)
+    return RedirectResponse(
+        url=f"/app/parametros/productos?err=en_uso&err_detail={en_uso}",
+        status_code=303,
+    )
 
 
 @app.post("/app/parametros/productos/{id_producto}/nutrientes")

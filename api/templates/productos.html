@@ -15,6 +15,19 @@
 {% block content %}
 <div class="prod-page">
 
+  {% if alert_err %}
+  <div class="matriz-alert" style="background:#fee2e2;border-color:#dc2626;color:#7f1d1d;" role="alert">
+    <span>{{ alert_err }}</span>
+    <button type="button" class="matriz-alert-close" onclick="this.parentElement.remove()" aria-label="Cerrar">×</button>
+  </div>
+  {% endif %}
+  {% if alert_ok %}
+  <div class="matriz-alert" style="background:#dcfce7;border-color:#16a34a;color:#14532d;" role="status">
+    <span>{{ alert_ok }}</span>
+    <button type="button" class="matriz-alert-close" onclick="this.parentElement.remove()" aria-label="Cerrar">×</button>
+  </div>
+  {% endif %}
+
   <!-- Buscador -->
   <div class="prod-search-bar">
     <div class="prod-search-wrap">
@@ -146,6 +159,22 @@
           </span>
         </div>
       </form>
+
+      <form method="post"
+            action="/app/parametros/productos/{{ p.id }}/eliminar"
+            class="prod-delete-form"
+            onsubmit="return confirm('¿Estás seguro que deseas eliminar {{ p.nombre_comercial }}?\n\nEsta acción no se puede deshacer.');">
+        <button type="submit" class="prod-delete-btn" title="Eliminar producto">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor"
+               stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="3 6 5 6 21 6"/>
+            <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+            <path d="M10 11v6M14 11v6"/>
+            <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
+          </svg>
+          Eliminar producto
+        </button>
+      </form>
     </li>
     {% else %}
     <li class="prod-empty">
@@ -171,7 +200,9 @@
       </button>
     </header>
 
-    <form class="prod-drawer-form" method="post" action="/app/parametros/productos">
+    <form class="prod-drawer-form" method="post" action="/app/parametros/productos"
+          id="prodCreateForm"
+          onsubmit="if(this.dataset.busy){return false;}this.dataset.busy='1';const b=this.querySelector('button[type=submit]');if(b){b.disabled=true;b.textContent='Creando…';}">
       <div class="prod-drawer-field">
         <label class="prod-drawer-label">Nombre comercial</label>
         <input type="text" name="nombre_comercial" required placeholder="Ej: Urea Granulada"

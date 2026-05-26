@@ -883,6 +883,54 @@ def get_modos_accion() -> list:
             return cur.fetchall()
 
 
+def existe_producto_por_nombre(nombre_comercial: str) -> bool:
+    """True si ya existe un fertilizante (id_actividad=5) con el mismo nombre
+    normalizado (trim + lower)."""
+    sql = """
+        SELECT 1 FROM DIM_AREATECNICA_FITO_PRODUCTO
+        WHERE id_actividad = '5'
+          AND TRIM(LOWER(nombre_comercial)) = TRIM(LOWER(%s))
+        LIMIT 1
+    """
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(sql, (nombre_comercial,))
+            return cur.fetchone() is not None
+
+
+def contar_uso_producto(id_producto: str) -> int:
+    """Cantidad de filas en PRODUCTOSPROGRAMA que usan el producto."""
+    sql = """
+        SELECT COUNT(*) AS n FROM FACT_AREATECNICA_FERTILIZACION_PRODUCTOSPROGRAMA
+        WHERE id_producto = %s
+    """
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(sql, (id_producto,))
+            return int(cur.fetchone()["n"])
+
+
+def eliminar_producto(id_producto: str) -> tuple[bool, int]:
+    """Elimina un producto y sus nutrientes asociados.
+    Si el producto esta en uso (filas en PRODUCTOSPROGRAMA), no borra y
+    retorna (False, cantidad_en_uso). Si todo bien retorna (True, 0)."""
+    en_uso = contar_uso_producto(id_producto)
+    if en_uso > 0:
+        return False, en_uso
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "DELETE FROM DIM_AREATECNICA_FITO_PRODUCTONUTRIENTES WHERE id_producto = %s",
+                (id_producto,),
+            )
+            cur.execute(
+                "DELETE FROM DIM_AREATECNICA_FITO_PRODUCTO WHERE id = %s",
+                (id_producto,),
+            )
+        conn.commit()
+    return True, 0
+
+
 def save_producto(nombre_comercial: str, id_unidad: int, codigo_softland: int | None,
                   n: float, k: float, p: float, mg: float,
                   b: float, ca: float, zn: float, mn: float,
