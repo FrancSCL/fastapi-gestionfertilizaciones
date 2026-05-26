@@ -27,7 +27,7 @@ from .queries import (
     get_semanas_disponibles_cuartel, agregar_semana_programa, eliminar_semana_programa,
     get_productos_lista, get_unidades_lista, save_producto, update_producto_nutrientes,
     get_objetivos, get_modos_accion,
-    existe_producto_por_nombre, eliminar_producto,
+    existe_producto_por_nombre, eliminar_producto as eliminar_producto_db,
     get_papeleta_campo_rows, get_cuarteles_huerfanos, get_sucursal_info, get_semana_info,
     validar_login, get_sucursales_permitidas,
 )
@@ -804,7 +804,7 @@ def crear_producto(
 @app.post("/app/parametros/productos/{id_producto}/eliminar")
 def eliminar_producto_endpoint(request: Request, id_producto: str):
     _require_admin(request)
-    ok, en_uso = eliminar_producto(id_producto)
+    ok, en_uso = eliminar_producto_db(id_producto)
     if ok:
         return RedirectResponse(url="/app/parametros/productos?ok=eliminado", status_code=303)
     return RedirectResponse(
