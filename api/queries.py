@@ -865,8 +865,9 @@ def save_producto(nombre_comercial: str, id_unidad: int, codigo_softland: int | 
         with conn.cursor() as cur:
             cur.execute(
                 """INSERT INTO DIM_AREATECNICA_FITO_PRODUCTO
-                   (id, nombre_comercial, id_unidad, codigo_softland, precio_usd, id_actividad)
-                   VALUES (%s, %s, %s, %s, %s, 5)""",
+                   (id, nombre_comercial, id_unidad, codigo_softland, precio_usd,
+                    id_actividad, id_objetivo, id_modo_accion, reingreso)
+                   VALUES (%s, %s, %s, %s, %s, '5', '', '', 0)""",
                 (id_prod, nombre_comercial, id_unidad, codigo_softland or None, precio_usd or 0),
             )
             cur.execute(
