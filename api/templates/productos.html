@@ -87,6 +87,32 @@
             hx-on::before-request="this.classList.add('saving');this.classList.remove('saved')"
             hx-on::after-request="this.classList.remove('saving');if(event.detail.successful){this.classList.add('saved');setTimeout(()=>this.classList.remove('saved'),900)}">
 
+        <div class="prod-detail-identificacion">
+          <div class="prod-detail-id-field prod-detail-id-nombre">
+            <label class="prod-detail-label-small">Nombre comercial</label>
+            <input type="text" name="nombre_comercial"
+                   value="{{ p.nombre_comercial }}"
+                   class="prod-input">
+          </div>
+          <div class="prod-detail-id-field">
+            <label class="prod-detail-label-small">Cód. Softland</label>
+            <input type="number" name="codigo_softland"
+                   value="{{ p.codigo_softland if p.codigo_softland is not none else '' }}"
+                   placeholder="—"
+                   class="prod-input">
+          </div>
+          <div class="prod-detail-id-field">
+            <label class="prod-detail-label-small">Unidad</label>
+            <select name="id_unidad" class="prod-input">
+              {% for u in unidades %}
+              <option value="{{ u.id }}" {% if (p.id_unidad if p.id_unidad is defined else '') == u.id %}selected{% endif %}>
+                {{ u.abreviatura }}{% if u.unidad %} — {{ u.unidad }}{% endif %}
+              </option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+
         <div class="prod-detail-grid">
           <div class="prod-detail-section">
             <span class="prod-detail-section-title">Eficiencia</span>

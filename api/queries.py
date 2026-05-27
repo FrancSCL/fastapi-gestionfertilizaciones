@@ -827,6 +827,7 @@ def get_productos_lista() -> list:
             p.id_objetivo,
             p.id_modo_accion,
             p.reingreso,
+            p.id_unidad,
             u.abreviatura   AS unidad,
             pn.eficiencia_fertilizante,
             COALESCE(pn.n,  0) AS n,
@@ -884,18 +885,21 @@ def get_modos_accion() -> list:
             return cur.fetchall()
 
 
-def existe_producto_por_nombre(nombre_comercial: str) -> bool:
+def existe_producto_por_nombre(nombre_comercial: str,
+                               excluir_id: str | None = None) -> bool:
     """True si ya existe un fertilizante (id_actividad=5) con el mismo nombre
-    normalizado (trim + lower)."""
+    normalizado (trim + lower). `excluir_id` permite ignorar el propio producto
+    al editarlo."""
     sql = """
         SELECT 1 FROM DIM_AREATECNICA_FITO_PRODUCTO
         WHERE id_actividad = '5'
           AND TRIM(LOWER(nombre_comercial)) = TRIM(LOWER(%s))
+          AND (%s IS NULL OR id <> %s)
         LIMIT 1
     """
     with get_connection() as conn:
         with conn.cursor() as cur:
-            cur.execute(sql, (nombre_comercial,))
+            cur.execute(sql, (nombre_comercial, excluir_id, excluir_id))
             return cur.fetchone() is not None
 
 
@@ -975,12 +979,20 @@ def update_producto_nutrientes(id_producto: str, n: float, k: float, p: float,
                                id_objetivo: str | None = None,
                                id_modo_accion: str | None = None,
                                reingreso: int | None = None,
-                               fe: float = 0.0) -> None:
-    """Actualiza nutrientes + eficiencia. Si vienen precio_usd / id_objetivo /
-    id_modo_accion / reingreso, tambien actualiza esos campos en
-    DIM_AREATECNICA_FITO_PRODUCTO en la misma transaccion.
+                               fe: float = 0.0,
+                               nombre_comercial: str | None = None,
+                               id_unidad: int | None = None,
+                               codigo_softland: int | None = None,
+                               _codigo_softland_set: bool = False) -> None:
+    """Actualiza nutrientes + eficiencia. Si vienen los demas params, actualiza
+    los campos correspondientes en DIM_AREATECNICA_FITO_PRODUCTO en la misma
+    transaccion.
 
-    Fe se guarda como info del producto pero no participa en calculos de UR."""
+    Fe se guarda como info del producto pero no participa en calculos de UR.
+
+    `codigo_softland` puede ser None intencional (limpiar el campo). Para
+    distinguirlo de "no enviado", se pasa adicionalmente _codigo_softland_set=True.
+    """
     with get_connection() as conn:
         with conn.cursor() as cur:
             cur.execute(
@@ -1001,6 +1013,12 @@ def update_producto_nutrientes(id_producto: str, n: float, k: float, p: float,
                 sets.append("id_modo_accion = %s"); vals.append(id_modo_accion or None)
             if reingreso is not None:
                 sets.append("reingreso = %s"); vals.append(reingreso)
+            if nombre_comercial is not None and nombre_comercial.strip():
+                sets.append("nombre_comercial = %s"); vals.append(nombre_comercial.strip())
+            if id_unidad is not None:
+                sets.append("id_unidad = %s"); vals.append(id_unidad)
+            if _codigo_softland_set:
+                sets.append("codigo_softland = %s"); vals.append(codigo_softland)
             if sets:
                 vals.append(id_producto)
                 cur.execute(

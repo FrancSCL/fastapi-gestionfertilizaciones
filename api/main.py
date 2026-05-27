@@ -824,6 +824,9 @@ def editar_nutrientes(
     id_objetivo: str = Form(""),
     id_modo_accion: str = Form(""),
     reingreso: str = Form(""),
+    nombre_comercial: str | None = Form(None),
+    id_unidad: str | None = Form(None),
+    codigo_softland: str | None = Form(None),
     n: float = Form(0),
     k: float = Form(0),
     p: float = Form(0),
@@ -837,6 +840,19 @@ def editar_nutrientes(
     _require_admin(request)
     # UI envia 0-100, BD guarda fracciones 0-1
     reingreso_int = _to_int(reingreso)
+
+    # Validar duplicado de nombre si esta cambiando
+    nombre = (nombre_comercial or "").strip()
+    if nombre and existe_producto_por_nombre(nombre, excluir_id=id_producto):
+        return RedirectResponse(
+            url="/app/parametros/productos?err=duplicado",
+            status_code=303,
+        )
+
+    id_unidad_int = _to_int(id_unidad)
+    cod_set = codigo_softland is not None
+    cod_int = _to_int(codigo_softland) if cod_set else None
+
     update_producto_nutrientes(
         id_producto,
         n/100, k/100, p/100, mg/100, b/100, ca/100, zn/100, mn/100,
@@ -846,6 +862,10 @@ def editar_nutrientes(
         id_modo_accion=id_modo_accion,
         reingreso=reingreso_int,
         fe=fe/100,
+        nombre_comercial=nombre if nombre else None,
+        id_unidad=id_unidad_int,
+        codigo_softland=cod_int,
+        _codigo_softland_set=cod_set,
     )
     return RedirectResponse(url="/app/parametros/productos", status_code=303)
 
