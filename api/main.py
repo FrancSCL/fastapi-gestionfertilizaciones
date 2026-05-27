@@ -779,6 +779,7 @@ def crear_producto(
     ca: float = Form(0),
     zn: float = Form(0),
     mn: float = Form(0),
+    fe: float = Form(0),
 ):
     _require_admin(request)
     # Anti-duplicado: si ya existe otro fertilizante con el mismo nombre, no crear
@@ -797,6 +798,7 @@ def crear_producto(
         id_objetivo=id_objetivo or None,
         id_modo_accion=id_modo_accion or None,
         reingreso=reingreso_int,
+        fe=fe/100,
     )
     return RedirectResponse(url="/app/parametros/productos", status_code=303)
 
@@ -830,6 +832,7 @@ def editar_nutrientes(
     ca: float = Form(0),
     zn: float = Form(0),
     mn: float = Form(0),
+    fe: float = Form(0),
 ):
     _require_admin(request)
     # UI envia 0-100, BD guarda fracciones 0-1
@@ -842,6 +845,7 @@ def editar_nutrientes(
         id_objetivo=id_objetivo,
         id_modo_accion=id_modo_accion,
         reingreso=reingreso_int,
+        fe=fe/100,
     )
     return RedirectResponse(url="/app/parametros/productos", status_code=303)
 

@@ -60,7 +60,7 @@
         <span class="prod-card-summary-meta">
           {% if p.unidad %}<span class="prod-card-unit">{{ p.unidad }}</span>{% endif %}
           {% set tags = [] %}
-          {% for nut in [('n','N'),('k','K'),('p','P'),('mg','Mg'),('b','B'),('ca','Ca'),('zn','Zn'),('mn','Mn')] %}
+          {% for nut in [('n','N'),('k','K'),('p','P'),('mg','Mg'),('b','B'),('ca','Ca'),('zn','Zn'),('mn','Mn'),('fe','Fe')] %}
             {% set v = (p[nut[0]] or 0) | float %}
             {% if v > 0 %}
               {% set _ = tags.append(nut[1] ~ ' ' ~ ('%g' | format((v*100) | round(2))) ~ '%') %}
@@ -136,7 +136,7 @@
           <div class="prod-detail-section prod-detail-aportes">
             <span class="prod-detail-section-title">Aportes <span class="prod-detail-section-hint">(% del peso del producto)</span></span>
             <div class="prod-nut-grid">
-              {% for nut in [('n','N'),('k','K'),('p','P'),('mg','Mg'),('b','B'),('ca','Ca'),('zn','Zn'),('mn','Mn')] %}
+              {% for nut in [('n','N'),('k','K'),('p','P'),('mg','Mg'),('b','B'),('ca','Ca'),('zn','Zn'),('mn','Mn'),('fe','Fe')] %}
               {%- set v = (p[nut[0]] or 0) | float * 100 -%}
               <label class="prod-nut">
                 <span class="prod-nut-label">{{ nut[1] }}</span>
@@ -260,7 +260,7 @@
       <div class="prod-drawer-section">
         <span class="prod-drawer-section-title">Aportes <span class="prod-detail-section-hint">(% del peso del producto)</span></span>
         <div class="prod-nut-grid prod-nut-grid-form">
-          {% for nut in [('n','N'),('k','K'),('p','P'),('mg','Mg'),('b','B'),('ca','Ca'),('zn','Zn'),('mn','Mn')] %}
+          {% for nut in [('n','N'),('k','K'),('p','P'),('mg','Mg'),('b','B'),('ca','Ca'),('zn','Zn'),('mn','Mn'),('fe','Fe')] %}
           <label class="prod-nut">
             <span class="prod-nut-label">{{ nut[1] }}</span>
             <input type="number" step="0.01" min="0" max="100" name="{{ nut[0] }}" value="0"

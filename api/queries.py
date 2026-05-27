@@ -836,7 +836,8 @@ def get_productos_lista() -> list:
             COALESCE(pn.b,  0) AS b,
             COALESCE(pn.ca, 0) AS ca,
             COALESCE(pn.zn, 0) AS zn,
-            COALESCE(pn.mn, 0) AS mn
+            COALESCE(pn.mn, 0) AS mn,
+            COALESCE(pn.fe, 0) AS fe
         FROM DIM_AREATECNICA_FITO_PRODUCTO p
         LEFT JOIN DIM_GENERAL_UNIDAD u ON u.id = p.id_unidad
         LEFT JOIN DIM_AREATECNICA_FITO_PRODUCTONUTRIENTES pn ON pn.id_producto = p.id
@@ -937,7 +938,9 @@ def save_producto(nombre_comercial: str, id_unidad: int, codigo_softland: int | 
                   eficiencia: float, precio_usd: float | None = None,
                   id_objetivo: str | None = None,
                   id_modo_accion: str | None = None,
-                  reingreso: int | None = None) -> None:
+                  reingreso: int | None = None,
+                  fe: float = 0.0) -> None:
+    """Fe se guarda solo como info del producto, no participa en calculos de UR."""
     import uuid as _uuid
     id_prod = str(_uuid.uuid4())[:25]
     id_nut  = str(_uuid.uuid4())
@@ -958,9 +961,9 @@ def save_producto(nombre_comercial: str, id_unidad: int, codigo_softland: int | 
             )
             cur.execute(
                 """INSERT INTO DIM_AREATECNICA_FITO_PRODUCTONUTRIENTES
-                   (id, id_producto, eficiencia_fertilizante, n, k, p, mg, b, ca, zn, mn)
-                   VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)""",
-                (id_nut, id_prod, eficiencia, n, k, p, mg, b, ca, zn, mn),
+                   (id, id_producto, eficiencia_fertilizante, n, k, p, mg, b, ca, zn, mn, fe)
+                   VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)""",
+                (id_nut, id_prod, eficiencia, n, k, p, mg, b, ca, zn, mn, fe),
             )
         conn.commit()
 
@@ -971,18 +974,21 @@ def update_producto_nutrientes(id_producto: str, n: float, k: float, p: float,
                                precio_usd: float | None = None,
                                id_objetivo: str | None = None,
                                id_modo_accion: str | None = None,
-                               reingreso: int | None = None) -> None:
+                               reingreso: int | None = None,
+                               fe: float = 0.0) -> None:
     """Actualiza nutrientes + eficiencia. Si vienen precio_usd / id_objetivo /
     id_modo_accion / reingreso, tambien actualiza esos campos en
-    DIM_AREATECNICA_FITO_PRODUCTO en la misma transaccion."""
+    DIM_AREATECNICA_FITO_PRODUCTO en la misma transaccion.
+
+    Fe se guarda como info del producto pero no participa en calculos de UR."""
     with get_connection() as conn:
         with conn.cursor() as cur:
             cur.execute(
                 """UPDATE DIM_AREATECNICA_FITO_PRODUCTONUTRIENTES
-                   SET n=%s, k=%s, p=%s, mg=%s, b=%s, ca=%s, zn=%s, mn=%s,
+                   SET n=%s, k=%s, p=%s, mg=%s, b=%s, ca=%s, zn=%s, mn=%s, fe=%s,
                        eficiencia_fertilizante=%s
                    WHERE id_producto=%s""",
-                (n, k, p, mg, b, ca, zn, mn, eficiencia, id_producto),
+                (n, k, p, mg, b, ca, zn, mn, fe, eficiencia, id_producto),
             )
             # Construir UPDATE dinamico del PRODUCTO con los campos que vinieron
             sets = []
