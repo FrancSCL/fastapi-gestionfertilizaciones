@@ -86,6 +86,7 @@
             hx-swap="none"
             hx-on::before-request="this.classList.add('saving');this.classList.remove('saved')"
             hx-on::after-request="this.classList.remove('saving');if(event.detail.successful){this.classList.add('saved');setTimeout(()=>this.classList.remove('saved'),900)}">
+      <div class="prod-card-detail-inner">
 
         <div class="prod-detail-identificacion">
           <div class="prod-detail-id-field prod-detail-id-nombre">
@@ -184,6 +185,7 @@
             <span class="prod-save-idle">los cambios se guardan al salir del campo</span>
           </span>
         </div>
+      </div>
       </form>
 
       <form method="post"

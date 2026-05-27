@@ -3038,6 +3038,10 @@ h4 { font-size: 0.875rem; text-transform: uppercase; letter-spacing: 0.04em; col
   margin: 0;
 }
 
+.prod-card:not(.is-open) .prod-delete-form {
+  display: none;
+}
+
 .prod-delete-btn {
   display: inline-flex;
   align-items: center;
