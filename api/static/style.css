@@ -3479,6 +3479,10 @@ h4 { font-size: 0.875rem; text-transform: uppercase; letter-spacing: 0.04em; col
   background: oklch(0.99 0.005 145);
 }
 
+.prod-card:not(.is-open) .prod-ia-form {
+  display: none;
+}
+
 .prod-ia-header {
   display: flex;
   align-items: center;
