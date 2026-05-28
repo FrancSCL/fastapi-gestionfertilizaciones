@@ -1,15 +1,23 @@
 {% extends "base.html" %}
 
 {% block title %}Productos{% endblock %}
-{% block topbar_title %}Productos · Fertilizantes{% endblock %}
+{% block topbar_title %}Productos{% endblock %}
 
 {% block topbar_extra %}
-<button type="button" class="prod-new-btn" onclick="openDrawer()">
-  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-    <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
-  </svg>
-  Nuevo producto
-</button>
+<div style="display:flex;align-items:center;gap:var(--sp-3);margin-left:auto;">
+  <div class="prod-tipo-tabs">
+    {% for tid, tnombre in tipos_habilitados %}
+    <a href="/app/parametros/productos?tipo={{ tid }}"
+       class="prod-tipo-tab {% if tipo_activo == tid %}is-active{% endif %}">{{ tnombre }}</a>
+    {% endfor %}
+  </div>
+  <button type="button" class="prod-new-btn" onclick="openDrawer()">
+    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+      <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+    </svg>
+    Nuevo {{ (tipos_habilitados | selectattr('0','equalto',tipo_activo) | map(attribute=1) | first) | lower }}
+  </button>
+</div>
 {% endblock %}
 
 {% block content %}
@@ -78,14 +86,16 @@
         </svg>
       </button>
 
+      {% set save_url = ('/app/parametros/productos/' ~ p.id ~ '/nutrientes') if es_fertilizante else ('/app/parametros/productos/' ~ p.id ~ '/general') %}
       <form class="prod-card-detail"
             method="post"
-            action="/app/parametros/productos/{{ p.id }}/nutrientes"
-            hx-post="/app/parametros/productos/{{ p.id }}/nutrientes"
+            action="{{ save_url }}"
+            hx-post="{{ save_url }}"
             hx-trigger="change from:input delay:400ms"
             hx-swap="none"
             hx-on::before-request="this.classList.add('saving');this.classList.remove('saved')"
             hx-on::after-request="this.classList.remove('saving');if(event.detail.successful){this.classList.add('saved');setTimeout(()=>this.classList.remove('saved'),900)}">
+      <input type="hidden" name="id_actividad" value="{{ tipo_activo }}">
       <div class="prod-card-detail-inner">
 
         <div class="prod-detail-identificacion">
@@ -116,15 +126,17 @@
 
         <div class="prod-detail-grid">
           <div class="prod-detail-section">
+            {% if es_fertilizante %}
             <span class="prod-detail-section-title">Eficiencia</span>
             <div class="prod-detail-efic">
               <input type="number" step="1" min="0" max="100" name="eficiencia"
                      value="{{ '%g' | format(efic_p | round(0)) }}"
-                     data-store="frac"
                      class="prod-input prod-input-efic">
               <span class="prod-input-suffix">%</span>
             </div>
-            <span class="prod-detail-section-title" style="margin-top:var(--sp-3);">Precio</span>
+            {% endif %}
+
+            <span class="prod-detail-section-title" {% if es_fertilizante %}style="margin-top:var(--sp-3);"{% endif %}>Precio</span>
             <div class="prod-detail-efic">
               <input type="number" step="0.01" min="0" name="precio_usd"
                      value="{{ '%.2f' | format((p.precio_usd or 0) | float) }}"
@@ -160,6 +172,7 @@
             </select>
           </div>
 
+          {% if es_fertilizante %}
           <div class="prod-detail-section prod-detail-aportes">
             <span class="prod-detail-section-title">Aportes <span class="prod-detail-section-hint">(% del peso del producto)</span></span>
             <div class="prod-nut-grid">
@@ -169,13 +182,13 @@
                 <span class="prod-nut-label">{{ nut[1] }}</span>
                 <input type="number" step="0.01" min="0" max="100" name="{{ nut[0] }}"
                        value="{{ '%g' | format(v | round(2)) }}"
-                       data-store="frac"
                        class="prod-input prod-nut-input">
                 <span class="prod-input-suffix">%</span>
               </label>
               {% endfor %}
             </div>
           </div>
+          {% endif %}
         </div>
 
         <div class="prod-detail-footer">
@@ -187,6 +200,63 @@
         </div>
       </div>
       </form>
+
+      {% if not es_fertilizante %}
+      {% set ias_actuales = ias_por_producto.get(p.id, []) %}
+      <form method="post"
+            action="/app/parametros/productos/{{ p.id }}/ias"
+            class="prod-ia-form"
+            data-id-prod="{{ p.id }}">
+        <input type="hidden" name="id_actividad" value="{{ tipo_activo }}">
+        <div class="prod-ia-header">
+          <span class="prod-detail-section-title">Ingredientes activos</span>
+          <button type="button" class="prod-ia-add-btn" onclick="addIaRow(this)">+ Agregar ingrediente</button>
+        </div>
+        <div class="prod-ia-rows">
+          {% for ia in ias_actuales %}
+          <div class="prod-ia-row">
+            <select name="id_ia" class="prod-input">
+              <option value="">— Ingrediente —</option>
+              {% for opt in ingredientes_activos %}
+              <option value="{{ opt.id }}" {% if opt.id == ia.id_ia %}selected{% endif %}>{{ opt.nombre }}</option>
+              {% endfor %}
+            </select>
+            <input type="number" step="0.01" min="0" name="porcentaje"
+                   value="{{ '%g' | format((ia.porcentaje or 0) | float) }}"
+                   placeholder="%" class="prod-input prod-ia-pct">
+            <select name="base_comparacion" class="prod-input prod-ia-base">
+              <option value="p/p" {% if ia.base_comparacion == 'p/p' %}selected{% endif %}>p/p</option>
+              <option value="p/v" {% if ia.base_comparacion == 'p/v' %}selected{% endif %}>p/v</option>
+            </select>
+            <button type="button" class="prod-ia-remove-btn" onclick="this.closest('.prod-ia-row').remove()" title="Quitar">×</button>
+          </div>
+          {% endfor %}
+          {% if not ias_actuales %}
+          <p class="prod-ia-empty">Sin ingredientes activos cargados. Click en "+ Agregar ingrediente".</p>
+          {% endif %}
+        </div>
+        <div class="prod-ia-footer">
+          <button type="submit" class="filter-btn">Guardar ingredientes</button>
+        </div>
+      </form>
+
+      <template class="prod-ia-row-template">
+        <div class="prod-ia-row">
+          <select name="id_ia" class="prod-input">
+            <option value="">— Ingrediente —</option>
+            {% for opt in ingredientes_activos %}
+            <option value="{{ opt.id }}">{{ opt.nombre }}</option>
+            {% endfor %}
+          </select>
+          <input type="number" step="0.01" min="0" name="porcentaje" placeholder="%" class="prod-input prod-ia-pct">
+          <select name="base_comparacion" class="prod-input prod-ia-base">
+            <option value="p/p">p/p</option>
+            <option value="p/v">p/v</option>
+          </select>
+          <button type="button" class="prod-ia-remove-btn" onclick="this.closest('.prod-ia-row').remove()" title="Quitar">×</button>
+        </div>
+      </template>
+      {% endif %}
 
       <form method="post"
             action="/app/parametros/productos/{{ p.id }}/eliminar"
@@ -206,7 +276,7 @@
     </li>
     {% else %}
     <li class="prod-empty">
-      <p>No hay productos fertilizantes cargados.</p>
+      <p>No hay productos cargados en esta categoría.</p>
       <button type="button" class="prod-new-btn" onclick="openDrawer()">+ Crear el primero</button>
     </li>
     {% endfor %}
@@ -222,7 +292,7 @@
   <div class="prod-drawer-overlay" onclick="closeDrawer()"></div>
   <aside class="prod-drawer-panel">
     <header class="prod-drawer-head">
-      <h2 class="prod-drawer-title">Nuevo producto</h2>
+      <h2 class="prod-drawer-title">Nuevo {{ (tipos_habilitados | selectattr('0','equalto',tipo_activo) | map(attribute=1) | first) | lower }}</h2>
       <button type="button" class="prod-drawer-close" onclick="closeDrawer()" aria-label="Cerrar">
         <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="6" y1="6" x2="18" y2="18"/><line x1="6" y1="18" x2="18" y2="6"/></svg>
       </button>
@@ -231,6 +301,8 @@
     <form class="prod-drawer-form" method="post" action="/app/parametros/productos"
           id="prodCreateForm"
           onsubmit="if(this.dataset.busy){return false;}this.dataset.busy='1';const b=this.querySelector('button[type=submit]');if(b){b.disabled=true;b.textContent='Creando…';}">
+      <input type="hidden" name="id_actividad" value="{{ tipo_activo }}">
+
       <div class="prod-drawer-field">
         <label class="prod-drawer-label">Nombre comercial</label>
         <input type="text" name="nombre_comercial" required placeholder="Ej: Urea Granulada"
@@ -250,10 +322,12 @@
           <label class="prod-drawer-label">Cód. Softland</label>
           <input type="number" name="codigo_softland" placeholder="opcional" class="prod-input">
         </div>
+        {% if es_fertilizante %}
         <div class="prod-drawer-field">
           <label class="prod-drawer-label">Eficiencia %</label>
           <input type="number" step="1" min="0" max="100" name="eficiencia" value="100" class="prod-input">
         </div>
+        {% endif %}
         <div class="prod-drawer-field">
           <label class="prod-drawer-label">Precio USD</label>
           <input type="number" step="0.01" min="0" name="precio_usd" value="0" class="prod-input">
@@ -285,6 +359,7 @@
         </div>
       </div>
 
+      {% if es_fertilizante %}
       <div class="prod-drawer-section">
         <span class="prod-drawer-section-title">Aportes <span class="prod-detail-section-hint">(% del peso del producto)</span></span>
         <div class="prod-nut-grid prod-nut-grid-form">
@@ -298,10 +373,18 @@
           {% endfor %}
         </div>
       </div>
+      {% else %}
+      <div class="prod-drawer-section">
+        <span class="prod-drawer-section-title">Ingredientes activos</span>
+        <p class="prod-ia-empty" style="margin:0;">
+          Primero creá el producto. Después podés cargarle ingredientes activos desde su ficha expandida.
+        </p>
+      </div>
+      {% endif %}
 
       <div class="prod-drawer-footer">
         <button type="button" class="prod-btn prod-btn-ghost" onclick="closeDrawer()">Cancelar</button>
-        <button type="submit" class="prod-btn">Crear producto</button>
+        <button type="submit" class="prod-btn">Crear {{ (tipos_habilitados | selectattr('0','equalto',tipo_activo) | map(attribute=1) | first) | lower }}</button>
       </div>
     </form>
   </aside>
@@ -358,6 +441,20 @@
       searchInput.focus();
     }
   });
+
+  // Agregar fila de ingrediente activo (clona <template>)
+  function addIaRow(btn) {
+    const form = btn.closest('.prod-ia-form');
+    if (!form) return;
+    const card = form.closest('.prod-card');
+    const template = card.querySelector('.prod-ia-row-template');
+    const rowsContainer = form.querySelector('.prod-ia-rows');
+    if (!template || !rowsContainer) return;
+    const empty = rowsContainer.querySelector('.prod-ia-empty');
+    if (empty) empty.remove();
+    const clone = template.content.cloneNode(true);
+    rowsContainer.appendChild(clone);
+  }
 
 </script>
 {% endblock %}

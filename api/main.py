@@ -28,6 +28,8 @@ from .queries import (
     get_productos_lista, get_unidades_lista, save_producto, update_producto_nutrientes,
     get_objetivos, get_modos_accion,
     existe_producto_por_nombre, eliminar_producto as eliminar_producto_db,
+    get_ingredientes_activos, get_actividades_producto,
+    get_ias_de_producto, save_ias_de_producto, update_producto_general,
     get_papeleta_campo_rows, get_cuarteles_huerfanos, get_sucursal_info, get_semana_info,
     validar_login, get_sucursales_permitidas,
 )
@@ -731,12 +733,18 @@ def post_factor(
     return RedirectResponse(url="/app/parametros", status_code=303)
 
 
+_TIPOS_HABILITADOS = [('5', 'Fertilizante'), ('48', 'Abono')]
+
+
 @app.get("/app/parametros/productos", response_class=HTMLResponse)
 def web_productos(request: Request, err: str | None = None, ok: str | None = None,
-                  err_detail: str | None = None):
+                  err_detail: str | None = None, tipo: str | None = None):
     _require_admin(request)
+    tipo_activo = tipo if tipo in {t[0] for t in _TIPOS_HABILITADOS} else '5'
+    es_fertilizante = (tipo_activo == '5')
+
     errores = {
-        "duplicado": "Ya existe un fertilizante con ese nombre. No se creó duplicado.",
+        "duplicado": "Ya existe un producto con ese nombre. No se creó duplicado.",
         "en_uso": (
             f"No se puede eliminar: el producto está en uso en "
             f"{err_detail or '?'} dosis cargadas. Quitalo de la matriz primero."
@@ -744,16 +752,30 @@ def web_productos(request: Request, err: str | None = None, ok: str | None = Non
     }
     oks = {
         "eliminado": "Producto eliminado correctamente.",
+        "creado": "Producto creado correctamente.",
     }
+
+    productos = get_productos_lista(id_actividad=tipo_activo)
+    # Para productos no-fertilizantes, traer sus IAs cargados
+    ias_por_producto: dict = {}
+    if not es_fertilizante:
+        for p in productos:
+            ias_por_producto[p["id"]] = get_ias_de_producto(p["id"])
+
     return templates.TemplateResponse(
         "productos.html",
         {
             "request": request,
             "active_page": "productos",
-            "productos": get_productos_lista(),
+            "tipos_habilitados": _TIPOS_HABILITADOS,
+            "tipo_activo": tipo_activo,
+            "es_fertilizante": es_fertilizante,
+            "productos": productos,
+            "ias_por_producto": ias_por_producto,
             "unidades": get_unidades_lista(),
             "objetivos": get_objetivos(),
             "modos_accion": get_modos_accion(),
+            "ingredientes_activos": get_ingredientes_activos() if not es_fertilizante else [],
             "alert_err": errores.get(err) if err else None,
             "alert_ok": oks.get(ok) if ok else None,
         },
@@ -780,15 +802,19 @@ def crear_producto(
     zn: float = Form(0),
     mn: float = Form(0),
     fe: float = Form(0),
+    id_actividad: str = Form('5'),
 ):
     _require_admin(request)
-    # Anti-duplicado: si ya existe otro fertilizante con el mismo nombre, no crear
-    if existe_producto_por_nombre(nombre_comercial.strip()):
+    # Solo permitir tipos habilitados
+    if id_actividad not in {t[0] for t in _TIPOS_HABILITADOS}:
+        id_actividad = '5'
+    # Anti-duplicado dentro del mismo tipo
+    if existe_producto_por_nombre(nombre_comercial.strip(), id_actividad=id_actividad):
         return RedirectResponse(
-            url="/app/parametros/productos?err=duplicado",
+            url=f"/app/parametros/productos?tipo={id_actividad}&err=duplicado",
             status_code=303,
         )
-    # UI envia 0-100, BD guarda fracciones 0-1
+    # UI envia 0-100, BD guarda fracciones 0-1 (solo aplica a fertilizantes)
     reingreso_int = _to_int(reingreso)
     save_producto(
         nombre_comercial.strip(), id_unidad, codigo_softland,
@@ -799,8 +825,80 @@ def crear_producto(
         id_modo_accion=id_modo_accion or None,
         reingreso=reingreso_int,
         fe=fe/100,
+        id_actividad=id_actividad,
     )
-    return RedirectResponse(url="/app/parametros/productos", status_code=303)
+    return RedirectResponse(
+        url=f"/app/parametros/productos?tipo={id_actividad}&ok=creado",
+        status_code=303,
+    )
+
+
+@app.post("/app/parametros/productos/{id_producto}/general")
+def editar_producto_general(
+    request: Request,
+    id_producto: str,
+    nombre_comercial: str | None = Form(None),
+    id_unidad: str | None = Form(None),
+    codigo_softland: str | None = Form(None),
+    precio_usd: float = Form(0),
+    id_objetivo: str = Form(""),
+    id_modo_accion: str = Form(""),
+    reingreso: str = Form(""),
+    id_actividad: str = Form('5'),
+):
+    """Edicion para productos NO fertilizantes (sin nutrientes)."""
+    _require_admin(request)
+    nombre = (nombre_comercial or "").strip()
+    if nombre and existe_producto_por_nombre(nombre, excluir_id=id_producto, id_actividad=id_actividad):
+        return RedirectResponse(
+            url=f"/app/parametros/productos?tipo={id_actividad}&err=duplicado",
+            status_code=303,
+        )
+    cod_set = codigo_softland is not None
+    update_producto_general(
+        id_producto,
+        nombre_comercial=nombre if nombre else None,
+        id_unidad=_to_int(id_unidad),
+        codigo_softland=_to_int(codigo_softland) if cod_set else None,
+        _codigo_softland_set=cod_set,
+        precio_usd=precio_usd,
+        id_objetivo=id_objetivo,
+        id_modo_accion=id_modo_accion,
+        reingreso=_to_int(reingreso),
+    )
+    return RedirectResponse(
+        url=f"/app/parametros/productos?tipo={id_actividad}",
+        status_code=303,
+    )
+
+
+@app.post("/app/parametros/productos/{id_producto}/ias")
+def editar_producto_ias(
+    request: Request,
+    id_producto: str,
+    id_actividad: str = Form('5'),
+    id_ia: list[str] = Form(default=[]),
+    porcentaje: list[str] = Form(default=[]),
+    base_comparacion: list[str] = Form(default=[]),
+):
+    """Reemplaza la lista de IAs de un producto. Listas paralelas."""
+    _require_admin(request)
+    ias = []
+    for i, iid in enumerate(id_ia):
+        if not iid:
+            continue
+        try:
+            pct = float(porcentaje[i]) if i < len(porcentaje) and porcentaje[i] else 0
+        except (ValueError, TypeError):
+            pct = 0
+        base = base_comparacion[i] if i < len(base_comparacion) and base_comparacion[i] else "p/p"
+        ias.append({"id_ia": iid, "porcentaje": pct, "base_comparacion": base})
+
+    save_ias_de_producto(id_producto, ias)
+    return RedirectResponse(
+        url=f"/app/parametros/productos?tipo={id_actividad}",
+        status_code=303,
+    )
 
 
 @app.post("/app/parametros/productos/{id_producto}/eliminar")

@@ -817,13 +817,15 @@ def save_factor(id: int, **kwargs) -> None:
 
 # ── Productos (CRUD) ──────────────────────────────────────────────────────────
 
-def get_productos_lista() -> list:
+def get_productos_lista(id_actividad: str = '5') -> list:
+    """Lista productos filtrados por id_actividad (default '5' = FERTILIZANTE)."""
     sql = """
         SELECT
             p.id,
             p.nombre_comercial,
             p.codigo_softland,
             COALESCE(p.precio_usd, 0) AS precio_usd,
+            p.id_actividad,
             p.id_objetivo,
             p.id_modo_accion,
             p.reingreso,
@@ -842,12 +844,12 @@ def get_productos_lista() -> list:
         FROM DIM_AREATECNICA_FITO_PRODUCTO p
         LEFT JOIN DIM_GENERAL_UNIDAD u ON u.id = p.id_unidad
         LEFT JOIN DIM_AREATECNICA_FITO_PRODUCTONUTRIENTES pn ON pn.id_producto = p.id
-        WHERE p.id_actividad = 5
+        WHERE p.id_actividad = %s
         ORDER BY p.nombre_comercial
     """
     with get_connection() as conn:
         with conn.cursor() as cur:
-            cur.execute(sql)
+            cur.execute(sql, (id_actividad,))
             return cur.fetchall()
 
 
@@ -857,6 +859,102 @@ def get_unidades_lista() -> list:
         with conn.cursor() as cur:
             cur.execute(sql)
             return cur.fetchall()
+
+
+def update_producto_general(id_producto: str,
+                            nombre_comercial: str | None = None,
+                            id_unidad: int | None = None,
+                            codigo_softland: int | None = None,
+                            _codigo_softland_set: bool = False,
+                            precio_usd: float | None = None,
+                            id_objetivo: str | None = None,
+                            id_modo_accion: str | None = None,
+                            reingreso: int | None = None) -> None:
+    """Actualiza campos generales del producto en DIM_AREATECNICA_FITO_PRODUCTO.
+    Util para productos que NO tienen fila de nutrientes (ej ABONO).
+    Construye un UPDATE dinamico con los campos efectivamente recibidos."""
+    sets = []
+    vals: list = []
+    if nombre_comercial is not None and nombre_comercial.strip():
+        sets.append("nombre_comercial = %s"); vals.append(nombre_comercial.strip())
+    if id_unidad is not None:
+        sets.append("id_unidad = %s"); vals.append(id_unidad)
+    if _codigo_softland_set:
+        sets.append("codigo_softland = %s"); vals.append(codigo_softland)
+    if precio_usd is not None:
+        sets.append("precio_usd = %s"); vals.append(precio_usd)
+    if id_objetivo is not None:
+        sets.append("id_objetivo = %s"); vals.append(id_objetivo or '')
+    if id_modo_accion is not None:
+        sets.append("id_modo_accion = %s"); vals.append(id_modo_accion or None)
+    if reingreso is not None:
+        sets.append("reingreso = %s"); vals.append(reingreso)
+    if not sets:
+        return
+    vals.append(id_producto)
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                f"UPDATE DIM_AREATECNICA_FITO_PRODUCTO SET {', '.join(sets)} WHERE id = %s",
+                vals,
+            )
+        conn.commit()
+
+
+def get_ingredientes_activos() -> list:
+    """Catalogo completo de ingredientes activos (DIM_PROD_IA)."""
+    sql = "SELECT id, ia AS nombre FROM DIM_PROD_IA WHERE ia IS NOT NULL AND ia <> '' ORDER BY ia"
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(sql)
+            return cur.fetchall()
+
+
+def get_actividades_producto() -> list:
+    """Catalogo completo de actividades/tipos de producto (DIM_PROD_ACTIVIDAD)."""
+    sql = "SELECT id, actividad_producto AS nombre FROM DIM_PROD_ACTIVIDAD ORDER BY actividad_producto"
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(sql)
+            return cur.fetchall()
+
+
+def get_ias_de_producto(id_producto: str) -> list:
+    """Lista de IAs asignados a un producto: id_ia, nombre, porcentaje, base."""
+    sql = """
+        SELECT pi.id, pi.id_ia, ia.ia AS nombre,
+               pi.porcentaje, pi.base_comparacion
+        FROM PIVOT_PROD_IA pi
+        LEFT JOIN DIM_PROD_IA ia ON ia.id = pi.id_ia
+        WHERE pi.id_prod = %s
+        ORDER BY ia.ia
+    """
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(sql, (id_producto,))
+            return cur.fetchall()
+
+
+def save_ias_de_producto(id_producto: str, ias: list) -> None:
+    """Reemplaza los IAs de un producto. `ias` = lista de dicts:
+        {'id_ia': str, 'porcentaje': float, 'base_comparacion': 'p/p'|'p/v'}
+    Se borran los existentes y se insertan los nuevos en una sola transaccion."""
+    import uuid as _uuid
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM PIVOT_PROD_IA WHERE id_prod = %s", (id_producto,))
+            for item in ias:
+                id_ia = (item.get("id_ia") or "").strip()
+                if not id_ia:
+                    continue
+                pct = float(item.get("porcentaje") or 0)
+                base = item.get("base_comparacion") or "p/p"
+                cur.execute(
+                    """INSERT INTO PIVOT_PROD_IA (id, id_prod, id_ia, porcentaje, base_comparacion)
+                       VALUES (%s, %s, %s, %s, %s)""",
+                    (str(_uuid.uuid4())[:25], id_producto, id_ia, pct, base),
+                )
+        conn.commit()
 
 
 def get_objetivos() -> list:
@@ -886,20 +984,21 @@ def get_modos_accion() -> list:
 
 
 def existe_producto_por_nombre(nombre_comercial: str,
-                               excluir_id: str | None = None) -> bool:
-    """True si ya existe un fertilizante (id_actividad=5) con el mismo nombre
-    normalizado (trim + lower). `excluir_id` permite ignorar el propio producto
-    al editarlo."""
+                               excluir_id: str | None = None,
+                               id_actividad: str = '5') -> bool:
+    """True si ya existe un producto del mismo tipo (id_actividad) con el mismo
+    nombre normalizado (trim + lower). `excluir_id` permite ignorar el propio
+    producto al editarlo."""
     sql = """
         SELECT 1 FROM DIM_AREATECNICA_FITO_PRODUCTO
-        WHERE id_actividad = '5'
+        WHERE id_actividad = %s
           AND TRIM(LOWER(nombre_comercial)) = TRIM(LOWER(%s))
           AND (%s IS NULL OR id <> %s)
         LIMIT 1
     """
     with get_connection() as conn:
         with conn.cursor() as cur:
-            cur.execute(sql, (nombre_comercial, excluir_id, excluir_id))
+            cur.execute(sql, (id_actividad, nombre_comercial, excluir_id, excluir_id))
             return cur.fetchone() is not None
 
 
@@ -943,33 +1042,43 @@ def save_producto(nombre_comercial: str, id_unidad: int, codigo_softland: int | 
                   id_objetivo: str | None = None,
                   id_modo_accion: str | None = None,
                   reingreso: int | None = None,
-                  fe: float = 0.0) -> None:
-    """Fe se guarda solo como info del producto, no participa en calculos de UR."""
+                  fe: float = 0.0,
+                  id_actividad: str = '5') -> str:
+    """Crea un producto. Para id_actividad='5' (FERTILIZANTE) inserta tambien
+    la fila de nutrientes. Para otros tipos (ej ABONO id='48') no crea
+    nutrientes — la composicion se maneja por ingredientes activos en
+    PIVOT_PROD_IA.
+
+    Retorna el id del producto creado."""
     import uuid as _uuid
     id_prod = str(_uuid.uuid4())[:25]
-    id_nut  = str(_uuid.uuid4())
     with get_connection() as conn:
         with conn.cursor() as cur:
             cur.execute(
                 """INSERT INTO DIM_AREATECNICA_FITO_PRODUCTO
                    (id, nombre_comercial, id_unidad, codigo_softland, precio_usd,
                     id_actividad, id_objetivo, id_modo_accion, reingreso)
-                   VALUES (%s, %s, %s, %s, %s, '5', %s, %s, %s)""",
+                   VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)""",
                 (
                     id_prod, nombre_comercial, id_unidad, codigo_softland or None,
                     precio_usd or 0,
+                    id_actividad,
                     id_objetivo or '',
                     id_modo_accion or None,
                     reingreso,
                 ),
             )
-            cur.execute(
-                """INSERT INTO DIM_AREATECNICA_FITO_PRODUCTONUTRIENTES
-                   (id, id_producto, eficiencia_fertilizante, n, k, p, mg, b, ca, zn, mn, fe)
-                   VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)""",
-                (id_nut, id_prod, eficiencia, n, k, p, mg, b, ca, zn, mn, fe),
-            )
+            # Solo fertilizantes tienen fila de nutrientes
+            if id_actividad == '5':
+                id_nut = str(_uuid.uuid4())
+                cur.execute(
+                    """INSERT INTO DIM_AREATECNICA_FITO_PRODUCTONUTRIENTES
+                       (id, id_producto, eficiencia_fertilizante, n, k, p, mg, b, ca, zn, mn, fe)
+                       VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)""",
+                    (id_nut, id_prod, eficiencia, n, k, p, mg, b, ca, zn, mn, fe),
+                )
         conn.commit()
+    return id_prod
 
 
 def update_producto_nutrientes(id_producto: str, n: float, k: float, p: float,

@@ -3439,3 +3439,118 @@ h4 { font-size: 0.875rem; text-transform: uppercase; letter-spacing: 0.04em; col
     animation: none !important;
   }
 }
+
+/* ── Tabs de tipo de producto (Fertilizante / Abono / …) ───────── */
+.prod-tipo-tabs {
+  display: inline-flex;
+  gap: 2px;
+  padding: 3px;
+  background: var(--lh-50);
+  border: 1px solid var(--lh-200);
+  border-radius: 8px;
+}
+
+.prod-tipo-tab {
+  padding: 6px 12px;
+  font-family: 'Archivo', system-ui, sans-serif;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: var(--lh-700);
+  text-decoration: none;
+  border-radius: 6px;
+  transition: background 0.15s var(--ease-out), color 0.15s var(--ease-out);
+}
+
+.prod-tipo-tab:hover {
+  background: var(--lh-100);
+  color: var(--lh-900);
+}
+
+.prod-tipo-tab.is-active {
+  background: var(--lh-700);
+  color: oklch(0.98 0.005 145);
+}
+
+/* ── Bloque Ingredientes Activos (en tarjeta de Abono) ─────────── */
+.prod-ia-form {
+  border-top: 1px solid var(--border-subtle, var(--lh-100));
+  padding: var(--sp-3) var(--sp-4) var(--sp-4);
+  background: oklch(0.99 0.005 145);
+}
+
+.prod-ia-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-2);
+  margin-bottom: var(--sp-2);
+}
+
+.prod-ia-add-btn {
+  padding: 5px 10px;
+  background: var(--lh-50);
+  color: var(--lh-800);
+  border: 1px dashed var(--lh-300);
+  border-radius: 6px;
+  font-family: 'Archivo', system-ui, sans-serif;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.prod-ia-add-btn:hover {
+  background: var(--lh-100);
+  border-color: var(--lh-500);
+  border-style: solid;
+}
+
+.prod-ia-rows {
+  display: grid;
+  gap: 6px;
+}
+
+.prod-ia-row {
+  display: grid;
+  grid-template-columns: 1fr 90px 80px 28px;
+  gap: 6px;
+  align-items: center;
+}
+
+.prod-ia-pct,
+.prod-ia-base {
+  text-align: right;
+}
+
+.prod-ia-remove-btn {
+  width: 26px;
+  height: 26px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 1.1rem;
+  line-height: 1;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+}
+
+.prod-ia-remove-btn:hover {
+  background: oklch(0.95 0.04 25);
+  color: oklch(0.45 0.15 25);
+}
+
+.prod-ia-empty {
+  margin: 0;
+  padding: var(--sp-2) 0;
+  font-size: 0.8125rem;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.prod-ia-footer {
+  margin-top: var(--sp-3);
+  display: flex;
+  justify-content: flex-end;
+}
