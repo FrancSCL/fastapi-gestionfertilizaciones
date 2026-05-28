@@ -910,6 +910,33 @@ def get_ingredientes_activos() -> list:
             return cur.fetchall()
 
 
+def crear_ingrediente_activo(nombre: str) -> dict:
+    """Crea un nuevo IA en DIM_PROD_IA. Retorna {id, nombre} o {error}.
+    Es case-insensitive: si ya existe uno con el mismo nombre, lo devuelve."""
+    import uuid as _uuid
+    nombre = (nombre or "").strip()
+    if not nombre:
+        return {"error": "El nombre no puede estar vacio."}
+    if len(nombre) > 100:
+        return {"error": "El nombre no puede tener mas de 100 caracteres."}
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT id, ia AS nombre FROM DIM_PROD_IA WHERE LOWER(ia) = LOWER(%s) LIMIT 1",
+                (nombre,),
+            )
+            existente = cur.fetchone()
+            if existente:
+                return {"id": existente["id"], "nombre": existente["nombre"], "duplicado": True}
+            nuevo_id = _uuid.uuid4().hex[:8]
+            cur.execute(
+                "INSERT INTO DIM_PROD_IA (id, ia) VALUES (%s, %s)",
+                (nuevo_id, nombre),
+            )
+        conn.commit()
+    return {"id": nuevo_id, "nombre": nombre}
+
+
 def get_actividades_producto() -> list:
     """Catalogo completo de actividades/tipos de producto (DIM_PROD_ACTIVIDAD)."""
     sql = "SELECT id, actividad_producto AS nombre FROM DIM_PROD_ACTIVIDAD ORDER BY actividad_producto"

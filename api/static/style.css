@@ -3491,7 +3491,13 @@ h4 { font-size: 0.875rem; text-transform: uppercase; letter-spacing: 0.04em; col
   margin-bottom: var(--sp-2);
 }
 
-.prod-ia-add-btn {
+.prod-ia-header-actions {
+  display: inline-flex;
+  gap: 6px;
+}
+
+.prod-ia-add-btn,
+.prod-ia-new-btn {
   padding: 5px 10px;
   background: var(--lh-50);
   color: var(--lh-800);
@@ -3504,10 +3510,22 @@ h4 { font-size: 0.875rem; text-transform: uppercase; letter-spacing: 0.04em; col
   transition: background 0.15s, border-color 0.15s;
 }
 
-.prod-ia-add-btn:hover {
+.prod-ia-add-btn:hover,
+.prod-ia-new-btn:hover {
   background: var(--lh-100);
   border-color: var(--lh-500);
   border-style: solid;
+}
+
+.prod-ia-new-btn {
+  background: transparent;
+  color: var(--lh-700);
+  border-color: var(--lh-200);
+}
+
+.prod-ia-new-btn:disabled {
+  opacity: 0.5;
+  cursor: wait;
 }
 
 .prod-ia-rows {

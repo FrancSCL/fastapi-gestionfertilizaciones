@@ -2,7 +2,7 @@ import os
 from pathlib import Path
 
 from fastapi import FastAPI, Form, HTTPException, Request
-from fastapi.responses import Response, HTMLResponse, RedirectResponse
+from fastapi.responses import Response, HTMLResponse, RedirectResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -28,7 +28,7 @@ from .queries import (
     get_productos_lista, get_unidades_lista, save_producto, update_producto_nutrientes,
     get_objetivos, get_modos_accion,
     existe_producto_por_nombre, eliminar_producto as eliminar_producto_db,
-    get_ingredientes_activos, get_actividades_producto,
+    get_ingredientes_activos, get_actividades_producto, crear_ingrediente_activo,
     get_ias_de_producto, save_ias_de_producto, update_producto_general,
     get_papeleta_campo_rows, get_cuarteles_huerfanos, get_sucursal_info, get_semana_info,
     validar_login, get_sucursales_permitidas,
@@ -899,6 +899,16 @@ def editar_producto_ias(
         url=f"/app/parametros/productos?tipo={id_actividad}",
         status_code=303,
     )
+
+
+@app.post("/app/parametros/ias/nuevo")
+def crear_ia_endpoint(request: Request, nombre: str = Form(...)):
+    """Crea un nuevo ingrediente activo. Responde JSON para uso desde fetch()."""
+    _require_admin(request)
+    resultado = crear_ingrediente_activo(nombre)
+    if "error" in resultado:
+        return JSONResponse(resultado, status_code=400)
+    return JSONResponse(resultado)
 
 
 @app.post("/app/parametros/productos/{id_producto}/eliminar")

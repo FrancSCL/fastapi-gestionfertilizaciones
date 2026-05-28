@@ -91,7 +91,7 @@
             method="post"
             action="{{ save_url }}"
             hx-post="{{ save_url }}"
-            hx-trigger="change from:input delay:400ms"
+            hx-trigger="change delay:400ms"
             hx-swap="none"
             hx-on::before-request="this.classList.add('saving');this.classList.remove('saved')"
             hx-on::after-request="this.classList.remove('saving');if(event.detail.successful){this.classList.add('saved');setTimeout(()=>this.classList.remove('saved'),900)}">
@@ -210,7 +210,10 @@
         <input type="hidden" name="id_actividad" value="{{ tipo_activo }}">
         <div class="prod-ia-header">
           <span class="prod-detail-section-title">Ingredientes activos</span>
-          <button type="button" class="prod-ia-add-btn" onclick="addIaRow(this)">+ Agregar ingrediente</button>
+          <div class="prod-ia-header-actions">
+            <button type="button" class="prod-ia-new-btn" onclick="crearNuevoIA(this)" title="Crear un IA que no esta en el catalogo">+ Nuevo IA</button>
+            <button type="button" class="prod-ia-add-btn" onclick="addIaRow(this)">+ Agregar ingrediente</button>
+          </div>
         </div>
         <div class="prod-ia-rows">
           {% for ia in ias_actuales %}
@@ -454,6 +457,46 @@
     if (empty) empty.remove();
     const clone = template.content.cloneNode(true);
     rowsContainer.appendChild(clone);
+    return rowsContainer.lastElementChild;
+  }
+
+  // Crear nuevo IA desde el form (prompt -> fetch -> agregar option globalmente)
+  async function crearNuevoIA(btn) {
+    const nombre = (prompt('Nombre del nuevo ingrediente activo:') || '').trim();
+    if (!nombre) return;
+    btn.disabled = true;
+    try {
+      const fd = new FormData();
+      fd.append('nombre', nombre);
+      const res = await fetch('/app/parametros/ias/nuevo', { method: 'POST', body: fd });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        alert(data.error || 'No se pudo crear el ingrediente.');
+        return;
+      }
+      // Insertar <option> en TODOS los selects de IA (selects normales y los <template>)
+      document.querySelectorAll('.prod-ia-form select[name="id_ia"]').forEach(sel => {
+        const opt = new Option(data.nombre, data.id);
+        sel.add(opt);
+      });
+      document.querySelectorAll('.prod-ia-row-template').forEach(tpl => {
+        const sel = tpl.content.querySelector('select[name="id_ia"]');
+        if (sel) sel.add(new Option(data.nombre, data.id));
+      });
+      // Agregar una fila lista con el IA preseleccionado
+      const row = addIaRow(btn);
+      if (row) {
+        const sel = row.querySelector('select[name="id_ia"]');
+        if (sel) sel.value = data.id;
+      }
+      if (data.duplicado) {
+        alert('Ese IA ya existia en el catalogo. Se selecciono el existente.');
+      }
+    } catch (e) {
+      alert('Error de red al crear el ingrediente.');
+    } finally {
+      btn.disabled = false;
+    }
   }
 
 </script>
