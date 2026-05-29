@@ -1511,6 +1511,7 @@ def get_semanas_disponibles(
 
     sql = f"""
         SELECT DISTINCT
+            sem.id                AS id,
             sem.etiqueta_semana,
             sem.semana_calendario,
             sem.fecha_inicio,
@@ -1520,7 +1521,7 @@ def get_semanas_disponibles(
         JOIN DIM_GENERAL_SUCURSAL         suc  ON suc.id  = ceco.id_sucursal
         JOIN DIM_GENERAL_SEMANASTEMPORADA sem  ON sem.id  = prog.semana
         WHERE {' AND '.join(where)}
-        ORDER BY sem.fecha_inicio DESC
+        ORDER BY sem.fecha_inicio ASC
     """
     with get_connection() as conn:
         with conn.cursor() as cur:

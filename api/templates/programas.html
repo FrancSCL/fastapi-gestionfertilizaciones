@@ -22,7 +22,7 @@
     <select class="filter-select" id="papeleta-semana" {% if not filtro_sucursal %}disabled{% endif %}>
       <option value="">Selecciona semana…</option>
       {% for s in semanas %}
-      <option value="{{ s.etiqueta_semana }}">{{ s.etiqueta_semana }}</option>
+      <option value="{{ s.etiqueta_semana }}">{% if s.fecha_inicio %}{{ s.fecha_inicio.strftime('%d/%m') }} · {% endif %}{{ s.etiqueta_semana }}</option>
       {% endfor %}
     </select>
     <button type="button" class="filter-btn" id="papeleta-download" disabled>
