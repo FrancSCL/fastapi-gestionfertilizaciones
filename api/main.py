@@ -32,6 +32,8 @@ from .queries import (
     get_ias_de_producto, save_ias_de_producto, update_producto_general,
     get_papeleta_campo_rows, get_cuarteles_huerfanos, get_sucursal_info, get_semana_info,
     validar_login, get_sucursales_permitidas,
+    listar_usuarios_con_sucursales, actualizar_rol_usuario, set_sucursales_usuario,
+    crear_usuario, resetear_password, eliminar_usuario, existe_usuario_nombre,
 )
 from .pdf_service import build_pdf, build_pdf_bodega, build_pdf_campo
 
@@ -169,7 +171,12 @@ def do_login(
     if user_rol == "admin":
         request.session["user_sucursales"] = None
     else:
-        request.session["user_sucursales"] = get_sucursales_permitidas(user["id"])
+        permitidas = get_sucursales_permitidas(user["id"])
+        request.session["user_sucursales"] = permitidas
+        # Pre-seleccionar la primera permitida para que el dropdown del topbar
+        # aparezca con un valor y los queries arranquen filtrados.
+        if permitidas:
+            request.session["id_sucursal"] = sorted(permitidas)[0]
     destino = next if next and next.startswith("/") else "/app/programas"
     return RedirectResponse(url=destino, status_code=303)
 
@@ -206,12 +213,42 @@ def _id_responsable(request: Request) -> int:
 
 
 def _es_admin(request: Request) -> bool:
-    return (request.session.get("user_rol") or "user") == "admin"
+    return (request.session.get("user_rol") or "user") in ("admin", "super_admin")
+
+
+def _es_super_admin(request: Request) -> bool:
+    return (request.session.get("user_rol") or "user") == "super_admin"
 
 
 def _require_admin(request: Request) -> None:
     if not _es_admin(request):
         raise HTTPException(status_code=403, detail="Acceso restringido a administradores.")
+
+
+def _require_super_admin(request: Request) -> None:
+    if not _es_super_admin(request):
+        raise HTTPException(status_code=403, detail="Acceso restringido a super administradores.")
+
+
+def _require_cuartel_permitido(request: Request, id_cuartel: int) -> None:
+    """Tira 403 si el cuartel pertenece a una sucursal fuera de los permisos del usuario.
+    Admin y super_admin no tienen restriccion. Cache por request para evitar queries
+    repetidas en endpoints que se invocan varias veces."""
+    permitidas = request.session.get("user_sucursales")
+    if permitidas is None:
+        return  # admin / super_admin
+    cache = getattr(request.state, "_cuartel_suc_cache", None)
+    if cache is None:
+        cache = {}
+        request.state._cuartel_suc_cache = cache
+    if id_cuartel in cache:
+        id_suc = cache[id_cuartel]
+    else:
+        from .queries import get_sucursal_de_cuartel
+        id_suc = get_sucursal_de_cuartel(id_cuartel)
+        cache[id_cuartel] = id_suc
+    if id_suc is None or id_suc not in set(permitidas):
+        raise HTTPException(status_code=403, detail="Cuartel no autorizado")
 
 
 # ══ WEB APP ═══════════════════════════════════════════════════════════════════
@@ -290,7 +327,7 @@ def web_programas(
             "request": request,
             "active_page": "programas",
             "temporadas": temporadas,
-            "sucursales": get_sucursales(),
+            "sucursales": request.state.sucursales_all,
             "especies": especies_disponibles,
             "variedades": variedades_de_especie,
             "grupos": grupos,
@@ -317,6 +354,7 @@ def web_matriz(
     temporada: int | None = None,
     err: str | None = None,
 ):
+    _require_cuartel_permitido(request, id_cuartel)
     cuartel = get_cuartel_info(id_cuartel)
     if not cuartel:
         raise HTTPException(status_code=404, detail="Cuartel no encontrado")
@@ -373,7 +411,7 @@ def web_listado_ur(
             "request": request,
             "active_page": "unidades-req",
             "temporadas": get_temporadas(),
-            "sucursales": get_sucursales(),
+            "sucursales": request.state.sucursales_all,
             "grupos": agrupar_por_sucursal(cuarteles),
             "total_cuarteles": len(cuarteles),
             "filtro_temporada": temporada,
@@ -385,6 +423,7 @@ def web_listado_ur(
 
 @app.get("/app/unidades/{id_cuartel}", response_class=HTMLResponse)
 def web_unidades(request: Request, id_cuartel: int, temporada: int | None = None):
+    _require_cuartel_permitido(request, id_cuartel)
     cuartel = get_cuartel_info(id_cuartel)
     if not cuartel:
         raise HTTPException(status_code=404, detail="Cuartel no encontrado")
@@ -505,6 +544,7 @@ def post_ajuste_agronomico_fila(
 ):
     """Autosave por fila desde la tabla de ajuste nutricional. Responde 204."""
     _require_admin(request)
+    _require_cuartel_permitido(request, id_cuartel)
     _aplicar_ajuste_y_regenerar_ur(
         request,
         id_cuartel,
@@ -524,6 +564,7 @@ def preview_unidades(
     id_estimacion: str,
     id_vigor: int,
 ):
+    _require_cuartel_permitido(request, id_cuartel)
     estimaciones = get_estimaciones_cuartel(id_cuartel)
     est = next((e for e in estimaciones if str(e["id_estimacion"]) == id_estimacion), None)
     if not est:
@@ -556,6 +597,7 @@ def crear_unidades(
     id_vigor: int = Form(...),
     id_temporada: int = Form(...),
 ):
+    _require_cuartel_permitido(request, id_cuartel)
     estimaciones = get_estimaciones_cuartel(id_cuartel)
     est = next((e for e in estimaciones if str(e["id_estimacion"]) == id_estimacion), None)
     if not est:
@@ -584,6 +626,7 @@ def crear_unidades(
 
 @app.get("/app/matriz/{id_cuartel}/productos-disponibles", response_class=HTMLResponse)
 def productos_disponibles_fragment(request: Request, id_cuartel: int, temporada: int | None = None):
+    _require_cuartel_permitido(request, id_cuartel)
     productos = get_productos_disponibles(id_cuartel, temporada)
     return templates.TemplateResponse(
         "fragment_productos_select.html",
@@ -593,10 +636,12 @@ def productos_disponibles_fragment(request: Request, id_cuartel: int, temporada:
 
 @app.post("/app/matriz/{id_cuartel}/agregar-producto")
 def agregar_producto(
+    request: Request,
     id_cuartel: int,
     id_producto: list[str] = Form(...),
     temporada: int | None = Form(None),
 ):
+    _require_cuartel_permitido(request, id_cuartel)
     # id_producto en BD es varchar(25) (UUID), no int
     ids_prog = get_programas_cuartel(id_cuartel, temporada)
     for pid in id_producto:
@@ -607,10 +652,12 @@ def agregar_producto(
 
 @app.post("/app/matriz/{id_cuartel}/eliminar-producto")
 def eliminar_producto(
+    request: Request,
     id_cuartel: int,
     id_producto: str = Form(...),
     temporada: int | None = Form(None),
 ):
+    _require_cuartel_permitido(request, id_cuartel)
     ids_prog = get_programas_cuartel(id_cuartel, temporada)
     eliminar_producto_cuartel(ids_prog, id_producto)
     url = f"/app/matriz/{id_cuartel}" + (f"?temporada={temporada}" if temporada else "")
@@ -619,11 +666,13 @@ def eliminar_producto(
 
 @app.post("/app/matriz/{id_cuartel}/dosis", response_class=HTMLResponse)
 def guardar_dosis(
+    request: Request,
     id_cuartel: int,
     id_programa: str = Form(...),
     id_producto: str = Form(...),
     dosis: float = Form(...),
 ):
+    _require_cuartel_permitido(request, id_cuartel)
     update_dosis(id_programa, id_producto, dosis)
     return HTMLResponse(f'<span class="celda-saved">{dosis:.0f}</span>', status_code=200)
 
@@ -634,6 +683,7 @@ def semanas_disponibles_fragment(
     id_cuartel: int,
     temporada: int | None = None,
 ):
+    _require_cuartel_permitido(request, id_cuartel)
     temporadas = get_temporadas()
     id_temp = temporada or (temporadas[0]["id"] if temporadas else None)
     semanas = get_semanas_disponibles_cuartel(id_cuartel, id_temp) if id_temp else []
@@ -656,6 +706,7 @@ def agregar_semana(
     etapa: str = Form("PRECOSECHA"),
     temporada: int = Form(...),
 ):
+    _require_cuartel_permitido(request, id_cuartel)
     _, created = agregar_semana_programa(
         id_cuartel=id_cuartel,
         id_temporada=temporada,
@@ -672,10 +723,12 @@ def agregar_semana(
 
 @app.post("/app/matriz/{id_cuartel}/eliminar-semana")
 def eliminar_semana(
+    request: Request,
     id_cuartel: int,
     id_programa: str = Form(...),
     temporada: int | None = Form(None),
 ):
+    _require_cuartel_permitido(request, id_cuartel)
     eliminar_semana_programa(id_programa)
     url = f"/app/matriz/{id_cuartel}" + (f"?temporada={temporada}" if temporada else "")
     return RedirectResponse(url=url, status_code=303)
@@ -695,6 +748,100 @@ def web_parametros(request: Request):
             "factores": get_factores_all(),
         },
     )
+
+
+# ══ Gestion de usuarios (solo super_admin) ════════════════════════════════════
+
+@app.get("/app/parametros/usuarios", response_class=HTMLResponse)
+def web_usuarios(request: Request, ok: str | None = None, err: str | None = None):
+    _require_super_admin(request)
+    usuarios = listar_usuarios_con_sucursales()
+    sucursales = request.state.sucursales_all  # admin/super_admin ven todas
+    return templates.TemplateResponse(
+        "usuarios.html",
+        {
+            "request": request,
+            "active_page": "usuarios",
+            "usuarios": usuarios,
+            "sucursales": sucursales,
+            "alert_ok": {"creado": "Usuario creado.",
+                         "actualizado": "Usuario actualizado.",
+                         "eliminado": "Usuario eliminado.",
+                         "password": "Contraseña reseteada."}.get(ok),
+            "alert_err": {"duplicado": "El nombre de usuario ya existe.",
+                          "self_delete": "No puedes eliminarte a ti mismo.",
+                          "self_demote": "No puedes quitarte el rol super_admin a ti mismo."}.get(err),
+        },
+    )
+
+
+@app.post("/app/parametros/usuarios")
+def post_crear_usuario(
+    request: Request,
+    usuario: str = Form(...),
+    nombre: str = Form(...),
+    apellido: str = Form(...),
+    contrasena: str = Form(...),
+    rol: str = Form("user"),
+    id_sucursal: list[str] = Form(default=[]),
+):
+    _require_super_admin(request)
+    usuario_n = (usuario or "").strip()
+    if not usuario_n or existe_usuario_nombre(usuario_n):
+        return RedirectResponse(url="/app/parametros/usuarios?err=duplicado", status_code=303)
+    new_id = crear_usuario(usuario_n, nombre, apellido, contrasena, rol)
+    if rol == "user" and id_sucursal:
+        set_sucursales_usuario(new_id, id_sucursal)
+    return RedirectResponse(url="/app/parametros/usuarios?ok=creado", status_code=303)
+
+
+@app.post("/app/parametros/usuarios/{id_usuario}/rol")
+def post_rol_usuario(
+    request: Request,
+    id_usuario: int,
+    rol: str = Form(...),
+):
+    _require_super_admin(request)
+    # No permitir quitarse el super_admin a uno mismo
+    if id_usuario == int(request.session.get("user_id") or 0) and rol != "super_admin":
+        return RedirectResponse(url="/app/parametros/usuarios?err=self_demote", status_code=303)
+    try:
+        actualizar_rol_usuario(id_usuario, rol)
+    except ValueError:
+        pass
+    return RedirectResponse(url="/app/parametros/usuarios?ok=actualizado", status_code=303)
+
+
+@app.post("/app/parametros/usuarios/{id_usuario}/sucursales")
+def post_sucursales_usuario(
+    request: Request,
+    id_usuario: int,
+    id_sucursal: list[str] = Form(default=[]),
+):
+    _require_super_admin(request)
+    set_sucursales_usuario(id_usuario, id_sucursal)
+    return RedirectResponse(url="/app/parametros/usuarios?ok=actualizado", status_code=303)
+
+
+@app.post("/app/parametros/usuarios/{id_usuario}/password")
+def post_password_usuario(
+    request: Request,
+    id_usuario: int,
+    nueva: str = Form(...),
+):
+    _require_super_admin(request)
+    if nueva:
+        resetear_password(id_usuario, nueva)
+    return RedirectResponse(url="/app/parametros/usuarios?ok=password", status_code=303)
+
+
+@app.post("/app/parametros/usuarios/{id_usuario}/eliminar")
+def post_eliminar_usuario(request: Request, id_usuario: int):
+    _require_super_admin(request)
+    if id_usuario == int(request.session.get("user_id") or 0):
+        return RedirectResponse(url="/app/parametros/usuarios?err=self_delete", status_code=303)
+    eliminar_usuario(id_usuario)
+    return RedirectResponse(url="/app/parametros/usuarios?ok=eliminado", status_code=303)
 
 
 @app.post("/app/parametros/vigor")
@@ -981,10 +1128,15 @@ def editar_nutrientes(
 # ══ API DE PAPELETAS ══════════════════════════════════════════════════════════
 
 @app.get("/papeleta/{id_programa}")
-def generar_papeleta(id_programa: str):
+def generar_papeleta(request: Request, id_programa: str):
     programa = get_programa(id_programa)
     if not programa:
         raise HTTPException(status_code=404, detail=f"Programa '{id_programa}' no encontrado")
+
+    # Bloquear si la sucursal del cuartel no esta entre las permitidas del usuario
+    permitidas = request.session.get("user_sucursales")
+    if permitidas is not None and programa.get("id_sucursal") not in set(permitidas):
+        raise HTTPException(status_code=403, detail="Sucursal no autorizada")
 
     productos = get_productos(id_programa)
     if not productos:
@@ -1348,6 +1500,10 @@ def descargar_adquisiciones_excel(
 
 @app.get("/papeleta-campo/{etiqueta_semana}/{id_sucursal}")
 def generar_papeleta_campo(request: Request, etiqueta_semana: str, id_sucursal: int):
+    # Bloquear sucursales fuera del set de permisos del usuario
+    permitidas = request.session.get("user_sucursales")
+    if permitidas is not None and id_sucursal not in set(permitidas):
+        raise HTTPException(status_code=403, detail="Sucursal no autorizada")
     sucursal = get_sucursal_info(id_sucursal)
     if not sucursal:
         raise HTTPException(status_code=404, detail="Sucursal no encontrada")

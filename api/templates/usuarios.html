@@ -1,0 +1,153 @@
+{% extends "base.html" %}
+
+{% block title %}Usuarios{% endblock %}
+{% block topbar_title %}Usuarios{% endblock %}
+
+{% block content %}
+<div class="params-layout">
+
+  {% if alert_err %}
+  <div class="matriz-alert" style="background:#fee2e2;border-color:#dc2626;color:#7f1d1d;" role="alert">
+    <span>{{ alert_err }}</span>
+    <button type="button" class="matriz-alert-close" onclick="this.parentElement.remove()" aria-label="Cerrar">×</button>
+  </div>
+  {% endif %}
+  {% if alert_ok %}
+  <div class="matriz-alert" style="background:#dcfce7;border-color:#16a34a;color:#14532d;" role="status">
+    <span>{{ alert_ok }}</span>
+    <button type="button" class="matriz-alert-close" onclick="this.parentElement.remove()" aria-label="Cerrar">×</button>
+  </div>
+  {% endif %}
+
+  <section class="data-table-wrap">
+    <div class="data-table-header">
+      <h2>Usuarios del sistema</h2>
+      <span class="data-table-count">{{ usuarios|length }} usuarios</span>
+    </div>
+
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Usuario</th>
+          <th>Nombre</th>
+          <th>Rol</th>
+          <th>Sucursales asignadas</th>
+          <th>Acciones</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for u in usuarios %}
+        <tr>
+          <td><strong>{{ u.usuario }}</strong></td>
+          <td>{{ u.nombre }} {{ u.apellido }}</td>
+
+          <td>
+            <form method="post" action="/app/parametros/usuarios/{{ u.id }}/rol" style="display:inline-flex;gap:6px;align-items:center;">
+              <select name="rol" class="param-input" onchange="this.form.submit()">
+                <option value="user" {% if u.rol == 'user' %}selected{% endif %}>user</option>
+                <option value="admin" {% if u.rol == 'admin' %}selected{% endif %}>admin</option>
+                <option value="super_admin" {% if u.rol == 'super_admin' %}selected{% endif %}>super_admin</option>
+              </select>
+            </form>
+          </td>
+
+          <td>
+            {% if u.rol == 'user' %}
+            <form method="post" action="/app/parametros/usuarios/{{ u.id }}/sucursales" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
+              <div style="display:flex;flex-wrap:wrap;gap:6px;">
+                {% for s in sucursales %}
+                <label style="display:inline-flex;align-items:center;gap:4px;font-size:0.8125rem;padding:3px 8px;background:var(--lh-50);border-radius:5px;border:1px solid var(--lh-200);">
+                  <input type="checkbox" name="id_sucursal" value="{{ s.id }}"
+                         {% if s.id in u.sucursales %}checked{% endif %}>
+                  {{ s.sucursal }}
+                </label>
+                {% endfor %}
+              </div>
+              <button type="submit" class="param-save-btn">Guardar</button>
+            </form>
+            {% else %}
+            <span style="color:var(--text-muted);font-style:italic;font-size:0.8125rem;">(acceso a todas)</span>
+            {% endif %}
+          </td>
+
+          <td>
+            <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
+              <form method="post" action="/app/parametros/usuarios/{{ u.id }}/password"
+                    onsubmit="const p=prompt('Nueva contraseña para {{ u.usuario }}:');if(!p){return false;}this.nueva.value=p;return true;"
+                    style="display:inline;">
+                <input type="hidden" name="nueva" value="">
+                <button type="submit" class="param-save-btn">Reset clave</button>
+              </form>
+              <form method="post" action="/app/parametros/usuarios/{{ u.id }}/eliminar"
+                    onsubmit="return confirm('¿Eliminar usuario {{ u.usuario }}?\n\nNo se puede deshacer.');"
+                    style="display:inline;">
+                <button type="submit" class="prod-delete-btn" style="padding:5px 10px;">Eliminar</button>
+              </form>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </section>
+
+  <section class="data-table-wrap" style="margin-top:var(--sp-5);">
+    <div class="data-table-header">
+      <h2>Crear nuevo usuario</h2>
+    </div>
+    <form method="post" action="/app/parametros/usuarios" style="padding:var(--sp-4);display:grid;gap:var(--sp-3);">
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:var(--sp-3);">
+        <div>
+          <label class="filter-label">Usuario</label>
+          <input type="text" name="usuario" required class="param-input" placeholder="ej: jperez">
+        </div>
+        <div>
+          <label class="filter-label">Nombre</label>
+          <input type="text" name="nombre" required class="param-input">
+        </div>
+        <div>
+          <label class="filter-label">Apellido</label>
+          <input type="text" name="apellido" required class="param-input">
+        </div>
+        <div>
+          <label class="filter-label">Contraseña inicial</label>
+          <input type="text" name="contrasena" required class="param-input">
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:200px 1fr;gap:var(--sp-3);">
+        <div>
+          <label class="filter-label">Rol</label>
+          <select name="rol" class="param-input" id="new-user-rol" onchange="toggleSucNew()">
+            <option value="user" selected>user</option>
+            <option value="admin">admin</option>
+            <option value="super_admin">super_admin</option>
+          </select>
+        </div>
+        <div id="new-user-sucursales">
+          <label class="filter-label">Sucursales (solo para rol "user")</label>
+          <div style="display:flex;flex-wrap:wrap;gap:6px;padding-top:4px;">
+            {% for s in sucursales %}
+            <label style="display:inline-flex;align-items:center;gap:4px;font-size:0.8125rem;padding:3px 8px;background:var(--lh-50);border-radius:5px;border:1px solid var(--lh-200);">
+              <input type="checkbox" name="id_sucursal" value="{{ s.id }}"> {{ s.sucursal }}
+            </label>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+      <div style="display:flex;justify-content:flex-end;">
+        <button type="submit" class="prod-btn">Crear usuario</button>
+      </div>
+    </form>
+  </section>
+
+</div>
+
+<script>
+  function toggleSucNew() {
+    const rol = document.getElementById('new-user-rol').value;
+    document.getElementById('new-user-sucursales').style.opacity = rol === 'user' ? '1' : '0.4';
+    document.getElementById('new-user-sucursales').style.pointerEvents = rol === 'user' ? 'auto' : 'none';
+  }
+  toggleSucNew();
+</script>
+{% endblock %}

@@ -1424,6 +1424,7 @@ def get_programa(id_programa: str) -> dict | None:
             ceco.id                 AS id_cuartel,
             ceco.descripcion_ceco   AS cuartel_nombre,
             ceco.sup_productiva,
+            suc.id                  AS id_sucursal,
             suc.sucursal,
             var.variedad,
             port.portainjerto       AS portainjerto_nombre
@@ -1702,6 +1703,15 @@ def get_semana_info(etiqueta_semana: str) -> dict | None:
 
 # ══ AUTH ═══════════════════════════════════════════════════════════════════════
 
+def get_sucursal_de_cuartel(id_cuartel: int) -> int | None:
+    """Lookup rapido id_cuartel -> id_sucursal. Para validar permisos."""
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT id_sucursal FROM DIM_GENERAL_CECO WHERE id = %s", (id_cuartel,))
+            r = cur.fetchone()
+            return r["id_sucursal"] if r else None
+
+
 def get_sucursales_permitidas(id_usuario: int) -> list:
     """Lista de id_sucursal autorizados para el usuario. Tolerante a que la
     tabla z_usuario_sucursal aun no exista (retorna [])."""
@@ -1719,6 +1729,122 @@ def get_sucursales_permitidas(id_usuario: int) -> list:
                 if e.args and e.args[0] == 1146:
                     return []
                 raise
+
+
+# ── Gestion de usuarios (super_admin) ────────────────────────────────────────
+
+def listar_usuarios() -> list:
+    """Lista todos los usuarios con su rol."""
+    sql = """
+        SELECT id, usuario, nombre, apellido, COALESCE(rol, 'user') AS rol
+        FROM z_usuarios_test
+        ORDER BY rol DESC, usuario
+    """
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(sql)
+            return cur.fetchall()
+
+
+def listar_usuarios_con_sucursales() -> list:
+    """Usuarios + lista de id_sucursal asignados (solo para roles 'user')."""
+    users = listar_usuarios()
+    if not users:
+        return []
+    ids = [u["id"] for u in users]
+    ph = ",".join(["%s"] * len(ids))
+    sql = f"SELECT id_usuario, id_sucursal FROM z_usuario_sucursal WHERE id_usuario IN ({ph})"
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(sql, ids)
+            asign = cur.fetchall()
+    sucs_por_user = {}
+    for a in asign:
+        sucs_por_user.setdefault(a["id_usuario"], []).append(a["id_sucursal"])
+    for u in users:
+        u["sucursales"] = sorted(sucs_por_user.get(u["id"], []))
+    return users
+
+
+def actualizar_rol_usuario(id_usuario: int, nuevo_rol: str) -> None:
+    """Cambia rol. Acepta 'user', 'admin', 'super_admin'."""
+    if nuevo_rol not in ("user", "admin", "super_admin"):
+        raise ValueError("rol invalido")
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "UPDATE z_usuarios_test SET rol = %s WHERE id = %s",
+                (nuevo_rol, id_usuario),
+            )
+        conn.commit()
+
+
+def set_sucursales_usuario(id_usuario: int, ids_sucursal: list) -> None:
+    """Reemplaza el set de sucursales asignadas al usuario."""
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "DELETE FROM z_usuario_sucursal WHERE id_usuario = %s",
+                (id_usuario,),
+            )
+            for sid in ids_sucursal:
+                try:
+                    sid_int = int(sid)
+                except (ValueError, TypeError):
+                    continue
+                cur.execute(
+                    "INSERT INTO z_usuario_sucursal (id_usuario, id_sucursal) VALUES (%s, %s)",
+                    (id_usuario, sid_int),
+                )
+        conn.commit()
+
+
+def crear_usuario(usuario: str, nombre: str, apellido: str,
+                   contrasena: str, rol: str = "user") -> int:
+    """Crea un usuario nuevo. Retorna id."""
+    if rol not in ("user", "admin", "super_admin"):
+        rol = "user"
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "INSERT INTO z_usuarios_test (usuario, nombre, apellido, `contraseña`, rol) "
+                "VALUES (%s, %s, %s, %s, %s)",
+                (usuario.strip(), nombre.strip(), apellido.strip(), contrasena, rol),
+            )
+            new_id = cur.lastrowid
+        conn.commit()
+    return new_id
+
+
+def resetear_password(id_usuario: int, nueva: str) -> None:
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "UPDATE z_usuarios_test SET `contraseña` = %s WHERE id = %s",
+                (nueva, id_usuario),
+            )
+        conn.commit()
+
+
+def eliminar_usuario(id_usuario: int) -> None:
+    """Borra usuario y sus asignaciones de sucursal."""
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM z_usuario_sucursal WHERE id_usuario = %s", (id_usuario,))
+            cur.execute("DELETE FROM z_usuarios_test WHERE id = %s", (id_usuario,))
+        conn.commit()
+
+
+def existe_usuario_nombre(usuario: str, excluir_id: int | None = None) -> bool:
+    sql = "SELECT 1 FROM z_usuarios_test WHERE usuario = %s"
+    params: list = [usuario.strip()]
+    if excluir_id:
+        sql += " AND id <> %s"
+        params.append(excluir_id)
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(sql + " LIMIT 1", params)
+            return cur.fetchone() is not None
 
 
 def validar_login(usuario: str, contrasena: str) -> dict | None:

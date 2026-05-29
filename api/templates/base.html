@@ -69,7 +69,7 @@
           Descuento bodega
         </a>
 
-        {% if request.session.get('user_rol') == 'admin' %}
+        {% if request.session.get('user_rol') in ['admin', 'super_admin'] %}
         <span class="sidebar-section-label">Configuración</span>
 
         <a href="/app/ajuste-agronomico"
@@ -119,6 +119,20 @@
           </svg>
           Productos
         </a>
+
+        {% if request.session.get('user_rol') == 'super_admin' %}
+        <a href="/app/parametros/usuarios"
+           class="nav-item {% if active_page == 'usuarios' %}active{% endif %}">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+               stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+            <circle cx="9" cy="7" r="4"/>
+            <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+            <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+          </svg>
+          Usuarios
+        </a>
+        {% endif %}
         {% endif %}
       </nav>
 
