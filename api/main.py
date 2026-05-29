@@ -531,7 +531,9 @@ def web_ajuste_agronomico(
     variedad: str | None = None,
     cuartel: int | None = None,
 ):
-    _require_admin(request)
+    # Acceso para todos los usuarios autenticados. Los users restringidos
+    # solo veran cuarteles de las sucursales que tienen asignadas (via
+    # _id_sucursal + listar_cuarteles_con_ajustes con id_sucursal).
     temporada_id = _to_int(temporada)
     sucursal_id = _to_int(sucursal)
     especie_id = _to_int(especie)
@@ -587,7 +589,6 @@ def post_ajuste_agronomico_fila(
     factor_mn: float = Form(1.0),
 ):
     """Autosave por fila desde la tabla de ajuste nutricional. Responde 204."""
-    _require_admin(request)
     _require_cuartel_permitido(request, id_cuartel)
     _aplicar_ajuste_y_regenerar_ur(
         request,

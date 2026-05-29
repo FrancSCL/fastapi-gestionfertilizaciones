@@ -69,9 +69,6 @@
           Descuento bodega
         </a>
 
-        {% if request.session.get('user_rol') in ['admin', 'super_admin'] %}
-        <span class="sidebar-section-label">Configuración</span>
-
         <a href="/app/ajuste-agronomico"
            class="nav-item {% if active_page == 'ajuste-agronomico' %}active{% endif %}">
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
@@ -80,6 +77,9 @@
           </svg>
           Ajuste nutricional
         </a>
+
+        {% if request.session.get('user_rol') in ['admin', 'super_admin'] %}
+        <span class="sidebar-section-label">Configuración</span>
 
         <a href="/app/adquisiciones"
            class="nav-item {% if active_page == 'adquisiciones' %}active{% endif %}">
