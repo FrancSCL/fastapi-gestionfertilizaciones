@@ -29,12 +29,14 @@ def _sacos_label(total: float) -> str:
 def build_pdf(programa: dict, productos: list, sectores: list) -> bytes:
     sup = float(programa.get("sup_productiva") or 0)
 
-    # ── Enriquecer productos ──────────────────────────────────────────────────
+    # ── Enriquecer productos. Omitir los que esta semana no se aplican (kg ~ 0).
     enriched_productos = []
     for p in productos:
         p = dict(p)
         dosis = float(p.get("dosis_ha") or 0)
         total = dosis * sup
+        if total < 0.05:
+            continue
 
         p["dosis_fmt"]  = _fmt(dosis, 0)
         p["total_fmt"]  = _fmt(total, 0)
@@ -63,6 +65,8 @@ def build_pdf(programa: dict, productos: list, sectores: list) -> bytes:
         for p in enriched_productos:
             dosis = float(p.get("dosis_ha") or 0)
             sec_total = dosis * sec_sup
+            if sec_total < 0.05:
+                continue
             plan_rows.append({
                 "semana_label":   programa.get("etiqueta_semana") or str(programa.get("semana_calendario", "")),
                 "sector_nombre":  sector["sector_nombre"],
@@ -294,6 +298,10 @@ def build_pdf_campo(
         dosis = float(r["dosis_ha"] or 0)
         sup = float(r["sup_sector_cuartel"] or 0)
         kg = dosis * sup
+        # Omitir productos con kg ~ 0 (la matriz puede tener producto en columna
+        # pero dosis 0 esta semana). Umbral 0.05 = lo que se redondea a "0.0".
+        if kg < 0.05:
+            continue
         sacos = math.ceil(kg / PESO_ENVASE_KG) if kg > 0 else 0
 
         pct_n = round(float(r.get("pct_n") or 0) * 100)
@@ -345,14 +353,18 @@ def build_pdf_campo(
                     for k, v in sorted(sec["totales"].items())
                 ]
 
-    # Convertir OrderedDicts a listas para el template
+    # Convertir OrderedDicts a listas para el template. Podar cuarteles sin
+    # productos (todos quedaron en 0 kg esta semana), sectores sin cuarteles,
+    # equipos sin sectores y casetas sin equipos.
     casetas_list = []
     for _, cas in casetas.items():
         equipos_list = []
         for _, eq in cas["equipos"].items():
             sectores_list = []
             for _, sec in eq["sectores"].items():
-                cuarteles_list = list(sec["cuarteles"].values())
+                cuarteles_list = [c for c in sec["cuarteles"].values() if c["productos"]]
+                if not cuarteles_list:
+                    continue
                 for c in cuarteles_list:
                     c["sup_sector_fmt"] = _fmt(c["sup_sector"], 2)
                 sectores_list.append({
@@ -362,10 +374,14 @@ def build_pdf_campo(
                     "cuarteles": cuarteles_list,
                     "totales": sec["totales_list"],
                 })
+            if not sectores_list:
+                continue
             equipos_list.append({
                 "nombre": eq["nombre"],
                 "sectores": sectores_list,
             })
+        if not equipos_list:
+            continue
         casetas_list.append({
             "nombre": cas["nombre"],
             "equipos": equipos_list,
@@ -387,6 +403,8 @@ def build_pdf_campo(
         if r["producto"]:
             dosis = float(r["dosis_ha"] or 0)
             kg = dosis * bucket["sup"]
+            if kg < 0.05:
+                continue
             bucket["productos"].append({
                 "nombre": r["producto"],
                 "dosis_fmt": _fmt(dosis, 1),
@@ -394,7 +412,8 @@ def build_pdf_campo(
                 "sacos": math.ceil(kg / PESO_ENVASE_KG) if kg > 0 else 0,
             })
             _agg(totales_campo, r["producto"], kg)
-    orfanos_list = list(orfanos_grouped.values())
+    # Podar huerfanos sin productos
+    orfanos_list = [b for b in orfanos_grouped.values() if b["productos"]]
 
     # Totales del campo ordenados alfabeticamente
     totales_campo_list = [
@@ -420,10 +439,12 @@ def build_pdf_campo(
     etiqueta = semana.get("etiqueta_semana", "") if semana else ""
     num_orden = f"{etiqueta} / {sucursal.get('sucursal', '')}" if sucursal else etiqueta
 
-    # Productos de cabecera con sacos calculados
+    # Productos de cabecera con sacos calculados. Omite los que no acumularon kg.
     productos_cabecera = []
     for p in sorted(productos_campo.values(), key=lambda x: x["nombre"]):
         kg = p["kg_total"]
+        if kg < 0.05:
+            continue
         productos_cabecera.append({
             "nombre": p["nombre"],
             "npk": p["npk"],
