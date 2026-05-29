@@ -924,7 +924,7 @@ def post_factor(
     return RedirectResponse(url="/app/parametros", status_code=303)
 
 
-_TIPOS_HABILITADOS = [('5', 'Fertilizante'), ('48', 'Abono')]
+_TIPOS_HABILITADOS = [('5', 'Abono'), ('48', 'Fertilizante')]
 
 
 @app.get("/app/parametros/productos", response_class=HTMLResponse)
@@ -932,7 +932,7 @@ def web_productos(request: Request, err: str | None = None, ok: str | None = Non
                   err_detail: str | None = None, tipo: str | None = None):
     _require_admin(request)
     tipo_activo = tipo if tipo in {t[0] for t in _TIPOS_HABILITADOS} else '5'
-    es_fertilizante = (tipo_activo == '5')
+    con_nutrientes = (tipo_activo == '5')
 
     errores = {
         "duplicado": "Ya existe un producto con ese nombre. No se creó duplicado.",
@@ -949,7 +949,7 @@ def web_productos(request: Request, err: str | None = None, ok: str | None = Non
     productos = get_productos_lista(id_actividad=tipo_activo)
     # Para productos no-fertilizantes, traer sus IAs cargados
     ias_por_producto: dict = {}
-    if not es_fertilizante:
+    if not con_nutrientes:
         for p in productos:
             ias_por_producto[p["id"]] = get_ias_de_producto(p["id"])
 
@@ -960,13 +960,13 @@ def web_productos(request: Request, err: str | None = None, ok: str | None = Non
             "active_page": "productos",
             "tipos_habilitados": _TIPOS_HABILITADOS,
             "tipo_activo": tipo_activo,
-            "es_fertilizante": es_fertilizante,
+            "con_nutrientes": con_nutrientes,
             "productos": productos,
             "ias_por_producto": ias_por_producto,
             "unidades": get_unidades_lista(),
             "objetivos": get_objetivos(),
             "modos_accion": get_modos_accion(),
-            "ingredientes_activos": get_ingredientes_activos() if not es_fertilizante else [],
+            "ingredientes_activos": get_ingredientes_activos() if not con_nutrientes else [],
             "alert_err": errores.get(err) if err else None,
             "alert_ok": oks.get(ok) if ok else None,
         },
