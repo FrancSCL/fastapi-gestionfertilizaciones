@@ -224,7 +224,7 @@
               <option value="{{ opt.id }}" {% if opt.id == ia.id_ia %}selected{% endif %}>{{ opt.nombre }}</option>
               {% endfor %}
             </select>
-            <input type="number" step="0.01" min="0" name="porcentaje"
+            <input type="number" step="0.001" min="0" name="porcentaje"
                    value="{{ '%g' | format((ia.porcentaje or 0) | float) }}"
                    placeholder="%" class="prod-input prod-ia-pct">
             <select name="base_comparacion" class="prod-input prod-ia-base">
@@ -251,7 +251,7 @@
             <option value="{{ opt.id }}">{{ opt.nombre }}</option>
             {% endfor %}
           </select>
-          <input type="number" step="0.01" min="0" name="porcentaje" placeholder="%" class="prod-input prod-ia-pct">
+          <input type="number" step="0.001" min="0" name="porcentaje" placeholder="%" class="prod-input prod-ia-pct">
           <select name="base_comparacion" class="prod-input prod-ia-base">
             <option value="p/p">p/p</option>
             <option value="p/v">p/v</option>
