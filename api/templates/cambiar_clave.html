@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+
+{% block title %}Cambiar contraseña{% endblock %}
+{% block topbar_title %}Cambiar contraseña{% endblock %}
+
+{% block content %}
+<div class="params-layout" style="max-width:480px;">
+
+  {% if alert_err %}
+  <div class="matriz-alert" style="background:#fee2e2;border-color:#dc2626;color:#7f1d1d;" role="alert">
+    <span>{{ alert_err }}</span>
+    <button type="button" class="matriz-alert-close" onclick="this.parentElement.remove()" aria-label="Cerrar">×</button>
+  </div>
+  {% endif %}
+  {% if alert_ok %}
+  <div class="matriz-alert" style="background:#dcfce7;border-color:#16a34a;color:#14532d;" role="status">
+    <span>{{ alert_ok }}</span>
+    <button type="button" class="matriz-alert-close" onclick="this.parentElement.remove()" aria-label="Cerrar">×</button>
+  </div>
+  {% endif %}
+
+  <section class="data-table-wrap">
+    <div class="data-table-header">
+      <h2>Cambiar tu contraseña</h2>
+    </div>
+    <form method="post" action="/cambiar-clave" style="padding:var(--sp-4);display:grid;gap:var(--sp-3);">
+      <div>
+        <label class="filter-label" for="actual">Contraseña actual</label>
+        <input type="password" id="actual" name="actual" required class="param-input" autocomplete="current-password">
+      </div>
+      <div>
+        <label class="filter-label" for="nueva">Nueva contraseña</label>
+        <input type="password" id="nueva" name="nueva" required minlength="4" class="param-input" autocomplete="new-password">
+      </div>
+      <div>
+        <label class="filter-label" for="confirmar">Confirmar nueva contraseña</label>
+        <input type="password" id="confirmar" name="confirmar" required minlength="4" class="param-input" autocomplete="new-password">
+      </div>
+      <p style="font-size:0.8125rem;color:var(--text-muted);margin:0;">
+        Mínimo 4 caracteres. Se cambia inmediatamente al confirmar.
+      </p>
+      <div style="display:flex;justify-content:flex-end;gap:var(--sp-2);">
+        <a href="/app/programas" class="prod-btn prod-btn-ghost">Cancelar</a>
+        <button type="submit" class="prod-btn">Cambiar contraseña</button>
+      </div>
+    </form>
+  </section>
+
+</div>
+{% endblock %}

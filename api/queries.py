@@ -1826,6 +1826,24 @@ def resetear_password(id_usuario: int, nueva: str) -> None:
         conn.commit()
 
 
+def cambiar_password_propia(id_usuario: int, actual: str, nueva: str) -> bool:
+    """Cambia la propia clave validando la actual. Retorna True si se cambio."""
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT 1 FROM z_usuarios_test WHERE id = %s AND `contraseña` = %s",
+                (id_usuario, actual),
+            )
+            if not cur.fetchone():
+                return False
+            cur.execute(
+                "UPDATE z_usuarios_test SET `contraseña` = %s WHERE id = %s",
+                (nueva, id_usuario),
+            )
+        conn.commit()
+    return True
+
+
 def eliminar_usuario(id_usuario: int) -> None:
     """Borra usuario y sus asignaciones de sucursal."""
     with get_connection() as conn:

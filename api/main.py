@@ -34,6 +34,7 @@ from .queries import (
     validar_login, get_sucursales_permitidas,
     listar_usuarios_con_sucursales, actualizar_rol_usuario, set_sucursales_usuario,
     crear_usuario, resetear_password, eliminar_usuario, existe_usuario_nombre,
+    cambiar_password_propia,
 )
 from .pdf_service import build_pdf, build_pdf_bodega, build_pdf_campo
 
@@ -189,6 +190,45 @@ def do_login(
 def do_logout(request: Request):
     request.session.clear()
     return RedirectResponse(url="/login", status_code=303)
+
+
+@app.get("/cambiar-clave", response_class=HTMLResponse)
+def web_cambiar_clave(request: Request, ok: str | None = None, err: str | None = None):
+    if not request.session.get("user_id"):
+        return RedirectResponse(url="/login?next=/cambiar-clave", status_code=303)
+    errores = {
+        "actual_incorrecta": "La contraseña actual no es correcta.",
+        "no_coincide": "La confirmación no coincide con la nueva contraseña.",
+        "muy_corta": "La nueva contraseña debe tener al menos 4 caracteres.",
+    }
+    return templates.TemplateResponse(
+        "cambiar_clave.html",
+        {
+            "request": request,
+            "active_page": "cambiar-clave",
+            "alert_ok": "Contraseña actualizada." if ok else None,
+            "alert_err": errores.get(err),
+        },
+    )
+
+
+@app.post("/cambiar-clave")
+def post_cambiar_clave(
+    request: Request,
+    actual: str = Form(...),
+    nueva: str = Form(...),
+    confirmar: str = Form(...),
+):
+    if not request.session.get("user_id"):
+        return RedirectResponse(url="/login", status_code=303)
+    if not nueva or len(nueva) < 4:
+        return RedirectResponse(url="/cambiar-clave?err=muy_corta", status_code=303)
+    if nueva != confirmar:
+        return RedirectResponse(url="/cambiar-clave?err=no_coincide", status_code=303)
+    ok = cambiar_password_propia(int(request.session["user_id"]), actual, nueva)
+    if not ok:
+        return RedirectResponse(url="/cambiar-clave?err=actual_incorrecta", status_code=303)
+    return RedirectResponse(url="/cambiar-clave?ok=1", status_code=303)
 
 
 @app.post("/set-sucursal")
