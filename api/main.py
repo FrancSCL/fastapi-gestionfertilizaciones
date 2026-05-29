@@ -72,9 +72,12 @@ class ContextMiddleware(BaseHTTPMiddleware):
                 app.state.sucursales_cache = get_sucursales()
             except Exception:
                 app.state.sucursales_cache = []
-        # Filtrar segun permisos: None = sin restriccion (admin)
+        # Filtrar segun permisos: None = sin restriccion (admin / super_admin).
+        # Defensive: si un admin viene de una sesion vieja con [] en lugar de
+        # None, NO filtrar a nada.
         permitidas = request.session.get("user_sucursales")
-        if permitidas is None:
+        rol = request.session.get("user_rol") or "user"
+        if permitidas is None or rol in ("admin", "super_admin"):
             request.state.sucursales_all = app.state.sucursales_cache
         else:
             permitidas_set = set(permitidas)
@@ -167,8 +170,9 @@ def do_login(
     request.session["user_initials"] = ((nombre[:1] + apellido[:1]).upper() or user["usuario"][:2].upper())
     user_rol = user.get("rol") or "user"
     request.session["user_rol"] = user_rol
-    # Sucursales permitidas: None para admin (sin restriccion), lista para user
-    if user_rol == "admin":
+    # Sucursales permitidas: None para admin / super_admin (sin restriccion),
+    # lista para user normal.
+    if user_rol in ("admin", "super_admin"):
         request.session["user_sucursales"] = None
     else:
         permitidas = get_sucursales_permitidas(user["id"])
