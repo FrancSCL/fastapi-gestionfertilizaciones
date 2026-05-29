@@ -486,6 +486,18 @@ def save_unidades_requeridas(id_cuartel: int, id_temporada: int, id_vigor: int,
 _FACTORES_NUT = ("n", "k", "p", "mg", "b", "ca", "zn", "mn")
 
 
+def _factor_or_default(v) -> float:
+    """Convierte v a float. None / '' -> 1.0 (sin ajuste). El 0 explicito se
+    respeta (significa anular el nutriente). NO usar `v or 1.0` porque 0 es
+    falsy en Python y se pierde la intencion del usuario."""
+    if v is None or v == "":
+        return 1.0
+    try:
+        return float(v)
+    except (TypeError, ValueError):
+        return 1.0
+
+
 def get_analisis_agronomico(id_cuartel: int, id_temporada: int) -> dict | None:
     sql = """
         SELECT * FROM FACT_AREATECNICA_FERTILIZACION_ANALISISAGRONOMICO
@@ -504,7 +516,7 @@ def tiene_ajuste_agronomico(id_cuartel: int, id_temporada: int) -> bool:
     if not fila:
         return False
     for nut in _FACTORES_NUT:
-        v = float(fila.get(f"factor_{nut}", 1.0) or 1.0)
+        v = _factor_or_default(fila.get(f"factor_{nut}"))
         if abs(v - 1.0) > 0.0001:
             return True
     return False
@@ -516,7 +528,7 @@ def save_analisis_agronomico(id_cuartel: int, id_temporada: int,
     factores = {'n': 0.8, 'k': 1.0, ...} (faltantes -> 1.0)."""
     import uuid
     from datetime import datetime
-    valores = {nut: float(factores.get(nut, 1.0) or 1.0) for nut in _FACTORES_NUT}
+    valores = {nut: _factor_or_default(factores.get(nut)) for nut in _FACTORES_NUT}
 
     sql_check = """
         SELECT id FROM FACT_AREATECNICA_FERTILIZACION_ANALISISAGRONOMICO
@@ -579,7 +591,7 @@ def recalcular_ur_con_ajuste(id_cuartel: int, id_temporada: int) -> bool:
         ("zn", "unidades_Zn"), ("mn", "unidades_Mn"),
     ]:
         valor_actual = float(ur.get(col_ur) or 0)
-        factor = float(ajuste.get(f"factor_{nut}", 1.0) or 1.0)
+        factor = _factor_or_default(ajuste.get(f"factor_{nut}"))
         nuevos.append(round(valor_actual * factor, 2))
     with get_connection() as conn:
         with conn.cursor() as cur:
