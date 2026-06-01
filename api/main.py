@@ -98,7 +98,10 @@ app.add_middleware(
     session_cookie="ferti_session",
     max_age=60 * 60 * 12,  # 12h
     same_site="lax",
-    https_only=False,
+    # En produccion (Cloud Run) la app esta detras de HTTPS. Marcar la cookie
+    # como Secure evita problemas con flujos OAuth donde el state se valida
+    # entre el authorize_redirect y el callback. En local con http, dejar False.
+    https_only=os.getenv("COOKIE_SECURE", "1") == "1",
 )
 
 
@@ -212,7 +215,14 @@ async def login_google(request: Request, next: str = "/app/programas"):
 async def auth_google_callback(request: Request):
     try:
         token = await oauth.google.authorize_access_token(request)
-    except OAuthError:
+    except OAuthError as e:
+        import logging
+        logging.error("OAuth callback fallo: %s | description=%s | session_keys=%s",
+                      e.error, e.description, list(request.session.keys()))
+        return RedirectResponse(url="/login?error=oauth", status_code=303)
+    except Exception as e:
+        import logging, traceback
+        logging.error("OAuth callback excepcion: %s\n%s", e, traceback.format_exc())
         return RedirectResponse(url="/login?error=oauth", status_code=303)
     userinfo = token.get("userinfo") or {}
     email = (userinfo.get("email") or "").lower()
