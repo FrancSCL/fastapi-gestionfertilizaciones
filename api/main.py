@@ -132,6 +132,13 @@ def health():
     return {"status": "ok"}
 
 
+@app.get("/", include_in_schema=False)
+def root(request: Request):
+    if request.session.get("user_id"):
+        return RedirectResponse(url="/app/programas", status_code=303)
+    return RedirectResponse(url="/login", status_code=303)
+
+
 # ══ LOGIN / LOGOUT ════════════════════════════════════════════════════════════
 
 # ══ GOOGLE OAUTH ══════════════════════════════════════════════════════════════
