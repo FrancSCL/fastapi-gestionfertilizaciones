@@ -31,10 +31,10 @@ from .queries import (
     get_ingredientes_activos, get_actividades_producto, crear_ingrediente_activo,
     get_ias_de_producto, save_ias_de_producto, update_producto_general,
     get_papeleta_campo_rows, get_cuarteles_huerfanos, get_sucursal_info, get_semana_info,
-    validar_login, get_sucursales_permitidas,
+    validar_login, get_sucursales_permitidas, get_usuario_por_email,
     listar_usuarios_con_sucursales, actualizar_rol_usuario, set_sucursales_usuario,
-    crear_usuario, resetear_password, eliminar_usuario, existe_usuario_nombre,
-    cambiar_password_propia,
+    crear_usuario, eliminar_usuario, existe_usuario_nombre,
+    actualizar_email_usuario,
 )
 from .pdf_service import build_pdf, build_pdf_bodega, build_pdf_campo
 
@@ -48,7 +48,7 @@ templates = Jinja2Templates(directory=BASE_DIR / "templates")
 # ══ AUTH MIDDLEWARE ═══════════════════════════════════════════════════════════
 
 PUBLIC_PATHS = {"/login", "/logout", "/health", "/", "/docs", "/openapi.json", "/redoc"}
-PUBLIC_PREFIXES = ("/static", "/papeleta", "/registro-semanal")
+PUBLIC_PREFIXES = ("/static", "/papeleta", "/registro-semanal", "/login/")
 
 
 class AuthMiddleware(BaseHTTPMiddleware):
@@ -132,58 +132,100 @@ def health():
     return {"status": "ok"}
 
 
+@app.get("/", include_in_schema=False)
+def root(request: Request):
+    if request.session.get("user_id"):
+        return RedirectResponse(url="/app/programas", status_code=303)
+    return RedirectResponse(url="/login", status_code=303)
+
+
 # ══ LOGIN / LOGOUT ════════════════════════════════════════════════════════════
 
-@app.get("/login", response_class=HTMLResponse)
-def web_login(request: Request, next: str = "/app/programas"):
-    if request.session.get("user_id"):
-        return RedirectResponse(url=next or "/app/programas", status_code=303)
-    return templates.TemplateResponse(
-        "login.html",
-        {"request": request, "next": next, "error": None, "usuario": ""},
-    )
+# ══ GOOGLE OAUTH ══════════════════════════════════════════════════════════════
+# Workspace exclusivo: hd=lahornilla.cl evita que cualquier Gmail entre al
+# consentimiento. Igual validamos el dominio del email en el callback porque
+# 'hd' es un hint de UI, no una garantia.
+WORKSPACE_DOMAIN = "lahornilla.cl"
+
+from authlib.integrations.starlette_client import OAuth, OAuthError  # noqa: E402
+
+oauth = OAuth()
+oauth.register(
+    name="google",
+    server_metadata_url="https://accounts.google.com/.well-known/openid-configuration",
+    client_id=os.getenv("GOOGLE_CLIENT_ID"),
+    client_secret=os.getenv("GOOGLE_CLIENT_SECRET"),
+    client_kwargs={
+        "scope": "openid email profile",
+        "prompt": "select_account",
+    },
+)
 
 
-@app.post("/login", response_class=HTMLResponse)
-def do_login(
-    request: Request,
-    usuario: str = Form(...),
-    contrasena: str = Form(...),
-    next: str = Form("/app/programas"),
-):
-    user = validar_login(usuario.strip(), contrasena)
-    if not user:
-        return templates.TemplateResponse(
-            "login.html",
-            {
-                "request": request,
-                "next": next,
-                "error": "Usuario o contraseña incorrectos.",
-                "usuario": usuario,
-            },
-            status_code=401,
-        )
+def _login_session_for(request: Request, user: dict, next_path: str) -> RedirectResponse:
+    """Setea la sesion despues de validar al usuario (login local u OAuth)."""
     nombre = user.get("nombre") or ""
     apellido = user.get("apellido") or ""
     request.session["user_id"] = user["id"]
     request.session["user_usuario"] = user["usuario"]
     request.session["user_name"] = (nombre + " " + apellido).strip() or user["usuario"]
-    request.session["user_initials"] = ((nombre[:1] + apellido[:1]).upper() or user["usuario"][:2].upper())
+    request.session["user_initials"] = (
+        (nombre[:1] + apellido[:1]).upper() or user["usuario"][:2].upper()
+    )
     user_rol = user.get("rol") or "user"
     request.session["user_rol"] = user_rol
-    # Sucursales permitidas: None para admin / super_admin (sin restriccion),
-    # lista para user normal.
     if user_rol in ("admin", "super_admin"):
         request.session["user_sucursales"] = None
     else:
         permitidas = get_sucursales_permitidas(user["id"])
         request.session["user_sucursales"] = permitidas
-        # Pre-seleccionar la primera permitida para que el dropdown del topbar
-        # aparezca con un valor y los queries arranquen filtrados.
         if permitidas:
             request.session["id_sucursal"] = sorted(permitidas)[0]
-    destino = next if next and next.startswith("/") else "/app/programas"
+    destino = next_path if next_path and next_path.startswith("/") else "/app/programas"
     return RedirectResponse(url=destino, status_code=303)
+
+
+@app.get("/login", response_class=HTMLResponse)
+def web_login(request: Request, next: str = "/app/programas", error: str | None = None):
+    if request.session.get("user_id"):
+        return RedirectResponse(url=next or "/app/programas", status_code=303)
+    errores = {
+        "dominio": "Tu cuenta no pertenece al dominio @lahornilla.cl.",
+        "no_registrado": "Tu correo no esta registrado en el sistema. Contacta a TI.",
+        "oauth": "No se pudo completar el inicio de sesion. Intenta de nuevo.",
+    }
+    return templates.TemplateResponse(
+        "login.html",
+        {"request": request, "next": next, "error": errores.get(error or "")},
+    )
+
+
+@app.get("/login/google")
+async def login_google(request: Request, next: str = "/app/programas"):
+    # Guardar destino post-login en la sesion (el state de OAuth no admite payload propio aca).
+    request.session["oauth_next"] = next if next and next.startswith("/") else "/app/programas"
+    redirect_uri = str(request.url_for("auth_google_callback"))
+    return await oauth.google.authorize_redirect(request, redirect_uri, hd=WORKSPACE_DOMAIN)
+
+
+@app.get("/login/google/callback", name="auth_google_callback")
+async def auth_google_callback(request: Request):
+    try:
+        token = await oauth.google.authorize_access_token(request)
+    except OAuthError:
+        return RedirectResponse(url="/login?error=oauth", status_code=303)
+    userinfo = token.get("userinfo") or {}
+    email = (userinfo.get("email") or "").lower()
+    if not email or not userinfo.get("email_verified"):
+        return RedirectResponse(url="/login?error=oauth", status_code=303)
+    # Validar dominio Workspace (defensa: hd es solo un hint en la UI de Google)
+    if not email.endswith(f"@{WORKSPACE_DOMAIN}"):
+        return RedirectResponse(url="/login?error=dominio", status_code=303)
+    user = get_usuario_por_email(email)
+    if not user:
+        return RedirectResponse(url="/login?error=no_registrado", status_code=303)
+    next_path = request.session.pop("oauth_next", "/app/programas")
+    return _login_session_for(request, user, next_path)
 
 
 @app.get("/logout")
@@ -192,43 +234,6 @@ def do_logout(request: Request):
     return RedirectResponse(url="/login", status_code=303)
 
 
-@app.get("/cambiar-clave", response_class=HTMLResponse)
-def web_cambiar_clave(request: Request, ok: str | None = None, err: str | None = None):
-    if not request.session.get("user_id"):
-        return RedirectResponse(url="/login?next=/cambiar-clave", status_code=303)
-    errores = {
-        "actual_incorrecta": "La contraseña actual no es correcta.",
-        "no_coincide": "La confirmación no coincide con la nueva contraseña.",
-        "muy_corta": "La nueva contraseña debe tener al menos 4 caracteres.",
-    }
-    return templates.TemplateResponse(
-        "cambiar_clave.html",
-        {
-            "request": request,
-            "active_page": "cambiar-clave",
-            "alert_ok": "Contraseña actualizada." if ok else None,
-            "alert_err": errores.get(err),
-        },
-    )
-
-
-@app.post("/cambiar-clave")
-def post_cambiar_clave(
-    request: Request,
-    actual: str = Form(...),
-    nueva: str = Form(...),
-    confirmar: str = Form(...),
-):
-    if not request.session.get("user_id"):
-        return RedirectResponse(url="/login", status_code=303)
-    if not nueva or len(nueva) < 4:
-        return RedirectResponse(url="/cambiar-clave?err=muy_corta", status_code=303)
-    if nueva != confirmar:
-        return RedirectResponse(url="/cambiar-clave?err=no_coincide", status_code=303)
-    ok = cambiar_password_propia(int(request.session["user_id"]), actual, nueva)
-    if not ok:
-        return RedirectResponse(url="/cambiar-clave?err=actual_incorrecta", status_code=303)
-    return RedirectResponse(url="/cambiar-clave?ok=1", status_code=303)
 
 
 @app.post("/set-sucursal")
@@ -811,9 +816,9 @@ def web_usuarios(request: Request, ok: str | None = None, err: str | None = None
             "sucursales": sucursales,
             "alert_ok": {"creado": "Usuario creado.",
                          "actualizado": "Usuario actualizado.",
-                         "eliminado": "Usuario eliminado.",
-                         "password": "Contraseña reseteada."}.get(ok),
+                         "eliminado": "Usuario eliminado."}.get(ok),
             "alert_err": {"duplicado": "El nombre de usuario ya existe.",
+                          "email_invalido": "El correo debe ser del dominio @lahornilla.cl.",
                           "self_delete": "No puedes eliminarte a ti mismo.",
                           "self_demote": "No puedes quitarte el rol super_admin a ti mismo."}.get(err),
         },
@@ -826,15 +831,18 @@ def post_crear_usuario(
     usuario: str = Form(...),
     nombre: str = Form(...),
     apellido: str = Form(...),
-    contrasena: str = Form(...),
+    email: str = Form(...),
     rol: str = Form("user"),
     id_sucursal: list[str] = Form(default=[]),
 ):
     _require_super_admin(request)
     usuario_n = (usuario or "").strip()
+    email_n = (email or "").strip().lower()
     if not usuario_n or existe_usuario_nombre(usuario_n):
         return RedirectResponse(url="/app/parametros/usuarios?err=duplicado", status_code=303)
-    new_id = crear_usuario(usuario_n, nombre, apellido, contrasena, rol)
+    if not email_n.endswith("@lahornilla.cl"):
+        return RedirectResponse(url="/app/parametros/usuarios?err=email_invalido", status_code=303)
+    new_id = crear_usuario(usuario_n, nombre, apellido, email_n, rol)
     if rol == "user" and id_sucursal:
         set_sucursales_usuario(new_id, id_sucursal)
     return RedirectResponse(url="/app/parametros/usuarios?ok=creado", status_code=303)
@@ -868,16 +876,18 @@ def post_sucursales_usuario(
     return RedirectResponse(url="/app/parametros/usuarios?ok=actualizado", status_code=303)
 
 
-@app.post("/app/parametros/usuarios/{id_usuario}/password")
-def post_password_usuario(
+@app.post("/app/parametros/usuarios/{id_usuario}/email")
+def post_email_usuario(
     request: Request,
     id_usuario: int,
-    nueva: str = Form(...),
+    email: str = Form(...),
 ):
     _require_super_admin(request)
-    if nueva:
-        resetear_password(id_usuario, nueva)
-    return RedirectResponse(url="/app/parametros/usuarios?ok=password", status_code=303)
+    email_n = (email or "").strip().lower()
+    if not email_n.endswith("@lahornilla.cl"):
+        return RedirectResponse(url="/app/parametros/usuarios?err=email_invalido", status_code=303)
+    actualizar_email_usuario(id_usuario, email_n)
+    return RedirectResponse(url="/app/parametros/usuarios?ok=actualizado", status_code=303)
 
 
 @app.post("/app/parametros/usuarios/{id_usuario}/eliminar")
