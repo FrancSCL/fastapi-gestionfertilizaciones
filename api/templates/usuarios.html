@@ -30,6 +30,7 @@
         <tr>
           <th>Usuario</th>
           <th>Nombre</th>
+          <th>Email (Google)</th>
           <th>Rol</th>
           <th>Sucursales asignadas</th>
           <th>Acciones</th>
@@ -40,6 +41,15 @@
         <tr>
           <td><strong>{{ u.usuario }}</strong></td>
           <td>{{ u.nombre }} {{ u.apellido }}</td>
+          <td>
+            <form method="post" action="/app/parametros/usuarios/{{ u.id }}/email" style="display:inline-flex;gap:6px;align-items:center;">
+              <input type="email" name="email" value="{{ u.email }}"
+                     class="param-input" style="min-width:200px;"
+                     pattern=".*@lahornilla\.cl$"
+                     title="Debe terminar en @lahornilla.cl">
+              <button type="submit" class="param-save-btn">Guardar</button>
+            </form>
+          </td>
 
           <td>
             <form method="post" action="/app/parametros/usuarios/{{ u.id }}/rol" style="display:inline-flex;gap:6px;align-items:center;">
@@ -71,19 +81,11 @@
           </td>
 
           <td>
-            <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
-              <form method="post" action="/app/parametros/usuarios/{{ u.id }}/password"
-                    onsubmit="const p=prompt('Nueva contraseña para {{ u.usuario }}:');if(!p){return false;}this.nueva.value=p;return true;"
-                    style="display:inline;">
-                <input type="hidden" name="nueva" value="">
-                <button type="submit" class="param-save-btn">Reset clave</button>
-              </form>
-              <form method="post" action="/app/parametros/usuarios/{{ u.id }}/eliminar"
-                    onsubmit="return confirm('¿Eliminar usuario {{ u.usuario }}?\n\nNo se puede deshacer.');"
-                    style="display:inline;">
-                <button type="submit" class="prod-delete-btn" style="padding:5px 10px;">Eliminar</button>
-              </form>
-            </div>
+            <form method="post" action="/app/parametros/usuarios/{{ u.id }}/eliminar"
+                  onsubmit="return confirm('¿Eliminar usuario {{ u.usuario }}?\n\nNo se puede deshacer.');"
+                  style="display:inline;">
+              <button type="submit" class="prod-delete-btn" style="padding:5px 10px;">Eliminar</button>
+            </form>
           </td>
         </tr>
         {% endfor %}
@@ -110,8 +112,11 @@
           <input type="text" name="apellido" required class="param-input">
         </div>
         <div>
-          <label class="filter-label">Contraseña inicial</label>
-          <input type="text" name="contrasena" required class="param-input">
+          <label class="filter-label">Email (Google)</label>
+          <input type="email" name="email" required class="param-input"
+                 placeholder="usuario@lahornilla.cl"
+                 pattern=".*@lahornilla\.cl$"
+                 title="Debe terminar en @lahornilla.cl">
         </div>
       </div>
       <div style="display:grid;grid-template-columns:200px 1fr;gap:var(--sp-3);">

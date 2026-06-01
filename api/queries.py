@@ -1734,9 +1734,10 @@ def get_sucursales_permitidas(id_usuario: int) -> list:
 # ── Gestion de usuarios (super_admin) ────────────────────────────────────────
 
 def listar_usuarios() -> list:
-    """Lista todos los usuarios con su rol."""
+    """Lista todos los usuarios con su rol y email."""
     sql = """
-        SELECT id, usuario, nombre, apellido, COALESCE(rol, 'user') AS rol
+        SELECT id, usuario, nombre, apellido, COALESCE(rol, 'user') AS rol,
+               COALESCE(email, '') AS email
         FROM z_usuarios_test
         ORDER BY rol DESC, usuario
     """
@@ -1800,20 +1801,32 @@ def set_sucursales_usuario(id_usuario: int, ids_sucursal: list) -> None:
 
 
 def crear_usuario(usuario: str, nombre: str, apellido: str,
-                   contrasena: str, rol: str = "user") -> int:
-    """Crea un usuario nuevo. Retorna id."""
+                   email: str, rol: str = "user") -> int:
+    """Crea un usuario nuevo. Login es por Google OAuth, asi que la clave queda
+    vacia. Retorna id."""
     if rol not in ("user", "admin", "super_admin"):
         rol = "user"
     with get_connection() as conn:
         with conn.cursor() as cur:
             cur.execute(
-                "INSERT INTO z_usuarios_test (usuario, nombre, apellido, `contraseña`, rol) "
-                "VALUES (%s, %s, %s, %s, %s)",
-                (usuario.strip(), nombre.strip(), apellido.strip(), contrasena, rol),
+                "INSERT INTO z_usuarios_test (usuario, nombre, apellido, `contraseña`, rol, email) "
+                "VALUES (%s, %s, %s, %s, %s, %s)",
+                (usuario.strip(), nombre.strip(), apellido.strip(), "", rol, email.strip().lower()),
             )
             new_id = cur.lastrowid
         conn.commit()
     return new_id
+
+
+def actualizar_email_usuario(id_usuario: int, email: str) -> None:
+    """Actualiza el correo de un usuario (usado para matchear con Google OAuth)."""
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "UPDATE z_usuarios_test SET email = %s WHERE id = %s",
+                (email.strip().lower(), id_usuario),
+            )
+        conn.commit()
 
 
 def resetear_password(id_usuario: int, nueva: str) -> None:
@@ -1863,6 +1876,27 @@ def existe_usuario_nombre(usuario: str, excluir_id: int | None = None) -> bool:
         with conn.cursor() as cur:
             cur.execute(sql + " LIMIT 1", params)
             return cur.fetchone() is not None
+
+
+def get_usuario_por_email(email: str) -> dict | None:
+    """Busca usuario por email para flujo OAuth. Tolerante a columna inexistente."""
+    import pymysql
+    sql = """
+        SELECT id, usuario, nombre, apellido, COALESCE(rol, 'user') AS rol, email
+        FROM z_usuarios_test
+        WHERE LOWER(email) = LOWER(%s)
+        LIMIT 1
+    """
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            try:
+                cur.execute(sql, (email.strip(),))
+                return cur.fetchone()
+            except pymysql.err.OperationalError as e:
+                # 1054 = Unknown column 'email' (tabla aun sin migrar)
+                if e.args and e.args[0] == 1054:
+                    return None
+                raise
 
 
 def validar_login(usuario: str, contrasena: str) -> dict | None:
