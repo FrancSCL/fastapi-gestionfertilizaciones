@@ -31,6 +31,7 @@ from .queries import (
     get_ingredientes_activos, get_actividades_producto, crear_ingrediente_activo,
     get_ias_de_producto, save_ias_de_producto, update_producto_general,
     get_papeleta_campo_rows, get_cuarteles_huerfanos, get_sucursal_info, get_semana_info,
+    get_casetas_con_programa, get_caseta_info,
     validar_login, get_sucursales_permitidas, get_usuario_por_email,
     listar_usuarios_con_sucursales, actualizar_rol_usuario, set_sucursales_usuario,
     crear_usuario, eliminar_usuario, existe_usuario_nombre,
@@ -1560,6 +1561,56 @@ def descargar_adquisiciones_excel(
         content=buf.read(),
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+@app.get("/papeleta-casetas/{etiqueta_semana}/{id_sucursal}")
+def listar_casetas_papeleta(request: Request, etiqueta_semana: str, id_sucursal: int):
+    """Devuelve JSON con casetas que tienen programa esta semana. Para popular
+    el select 'Papeleta por caseta' en programas.html."""
+    permitidas = request.session.get("user_sucursales")
+    if permitidas is not None and id_sucursal not in set(permitidas):
+        raise HTTPException(status_code=403, detail="Sucursal no autorizada")
+    casetas = get_casetas_con_programa(etiqueta_semana, id_sucursal)
+    return JSONResponse([{"id": c["id"], "caseta": c["caseta"]} for c in casetas])
+
+
+@app.get("/papeleta-caseta/{etiqueta_semana}/{id_sucursal}/{id_caseta}")
+def generar_papeleta_caseta(
+    request: Request, etiqueta_semana: str, id_sucursal: int, id_caseta: int,
+):
+    permitidas = request.session.get("user_sucursales")
+    if permitidas is not None and id_sucursal not in set(permitidas):
+        raise HTTPException(status_code=403, detail="Sucursal no autorizada")
+    sucursal = get_sucursal_info(id_sucursal)
+    if not sucursal:
+        raise HTTPException(status_code=404, detail="Sucursal no encontrada")
+    caseta = get_caseta_info(id_caseta)
+    if not caseta or caseta["id_sucursal"] != id_sucursal:
+        raise HTTPException(status_code=404, detail="Caseta no encontrada en esta sucursal")
+    semana = get_semana_info(etiqueta_semana)
+    if not semana:
+        raise HTTPException(status_code=404, detail=f"Semana '{etiqueta_semana}' no encontrada")
+
+    rows = get_papeleta_campo_rows(etiqueta_semana, id_sucursal)
+    supervisor = request.session.get("user_name", "") if hasattr(request, "session") else ""
+    pdf_bytes = build_pdf_campo(
+        rows=rows,
+        orfanos=[],
+        sucursal=sucursal,
+        semana=semana,
+        supervisor=supervisor,
+        id_caseta_filtro=id_caseta,
+        caseta_nombre=caseta["caseta"],
+    )
+    safe_suc = sucursal["sucursal"].replace(" ", "_")
+    safe_cas = caseta["caseta"].replace(" ", "_")
+    safe_sem = etiqueta_semana.replace(" ", "_")
+    filename = f"papeleta_{safe_suc}_{safe_cas}_{safe_sem}.pdf"
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'inline; filename="{filename}"'},
     )
 
 

@@ -565,7 +565,7 @@
   <div>
     <p class="doc-empresa">SOCIEDAD AGRÍCOLA LA HORNILLA LTDA.</p>
     <h1 class="doc-fundo">Fundo {{ sucursal.sucursal }}</h1>
-    <p class="doc-subtitle">Registro de Aplicaciones · Fertilizantes al Suelo</p>
+    <p class="doc-subtitle">Registro de Aplicaciones · Fertilizantes al Suelo{% if caseta_filtrada %} · Caseta {{ caseta_filtrada }}{% endif %}</p>
   </div>
   <div class="doc-orden">
     <span class="label">Orden N°</span>

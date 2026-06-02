@@ -25,6 +25,9 @@
       <option value="{{ s.etiqueta_semana }}">{% if s.fecha_inicio %}{{ s.fecha_inicio.strftime('%d/%m') }} · {% endif %}{{ s.etiqueta_semana }}</option>
       {% endfor %}
     </select>
+    <select class="filter-select" id="papeleta-caseta" disabled>
+      <option value="">Todo el campo</option>
+    </select>
     <button type="button" class="filter-btn" id="papeleta-download" disabled>
       <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
@@ -117,18 +120,40 @@
 
 <script>
   (function() {
-    const sel = document.getElementById('papeleta-semana');
-    const btn = document.getElementById('papeleta-download');
+    const selSem  = document.getElementById('papeleta-semana');
+    const selCas  = document.getElementById('papeleta-caseta');
+    const btn     = document.getElementById('papeleta-download');
     const idSucursal = {{ filtro_sucursal | default('null') | tojson }};
-    if (!sel || !btn) return;
+    if (!selSem || !btn || !selCas) return;
 
     function sync() {
-      btn.disabled = !(idSucursal && sel.value);
+      btn.disabled = !(idSucursal && selSem.value);
     }
-    sel.addEventListener('change', sync);
+
+    async function cargarCasetas() {
+      selCas.innerHTML = '<option value="">Todo el campo</option>';
+      selCas.disabled = true;
+      if (!idSucursal || !selSem.value) { sync(); return; }
+      try {
+        const r = await fetch(`/papeleta-casetas/${encodeURIComponent(selSem.value)}/${idSucursal}`);
+        if (!r.ok) return;
+        const casetas = await r.json();
+        for (const c of casetas) {
+          const o = document.createElement('option');
+          o.value = c.id; o.textContent = c.caseta;
+          selCas.appendChild(o);
+        }
+        selCas.disabled = casetas.length === 0;
+      } catch (e) { /* silencioso */ }
+    }
+
+    selSem.addEventListener('change', () => { cargarCasetas(); sync(); });
     btn.addEventListener('click', () => {
-      if (!idSucursal || !sel.value) return;
-      const url = `/papeleta-campo/${encodeURIComponent(sel.value)}/${idSucursal}`;
+      if (!idSucursal || !selSem.value) return;
+      const sem = encodeURIComponent(selSem.value);
+      const url = selCas.value
+        ? `/papeleta-caseta/${sem}/${idSucursal}/${selCas.value}`
+        : `/papeleta-campo/${sem}/${idSucursal}`;
       window.open(url, '_blank');
     });
     sync();

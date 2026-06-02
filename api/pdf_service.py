@@ -246,6 +246,8 @@ def build_pdf_campo(
     sucursal: dict,
     semana: dict,
     supervisor: str = "",
+    id_caseta_filtro: int | None = None,
+    caseta_nombre: str | None = None,
 ) -> bytes:
     """Papeleta semanal organizada por caseta → equipo → sector → cuartel.
 
@@ -253,8 +255,14 @@ def build_pdf_campo(
     orfanos:  filas planas de get_cuarteles_huerfanos()
     sucursal: {id, sucursal}
     semana:   {etiqueta_semana, fecha_inicio, fecha_fin, temporada}
+    id_caseta_filtro: si se pasa, deja solo esa caseta. Tambien oculta el
+        bloque de huerfanos (orfanos pertenecen al campo, no a una caseta).
     """
     from collections import OrderedDict
+
+    if id_caseta_filtro is not None:
+        rows = [r for r in rows if r.get("id_caseta") == id_caseta_filtro]
+        orfanos = []
 
     # Estructura anidada: casetas[].equipos[].sectores[].cuarteles[].productos[]
     casetas = OrderedDict()
@@ -473,6 +481,7 @@ def build_pdf_campo(
         total_kg_campo_fmt=_fmt(total_kg_campo, 1),
         total_sacos_campo=total_sacos_campo,
         fecha_emision=date.today().strftime("%d/%m/%Y"),
+        caseta_filtrada=caseta_nombre,
     )
     return HTML(string=html_str, base_url=str(TEMPLATES_DIR)).write_pdf()
 

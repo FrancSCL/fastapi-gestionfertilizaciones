@@ -1602,6 +1602,37 @@ def get_sectores_multiples(ids_cuartel: list) -> list:
 
 # ══ Papeleta por campo (caseta → equipo → sector → cuarteles) ═════════════════
 
+def get_casetas_con_programa(etiqueta_semana: str, id_sucursal: int) -> list:
+    """Casetas del campo que tienen al menos un cuartel con programa esta semana.
+    Util para poblar el dropdown de 'Papeleta por caseta'."""
+    sql = """
+        SELECT DISTINCT cas.id, cas.caseta
+        FROM DIM_AREATECNICA_RIEGO_CASETA cas
+        JOIN DIM_AREATECNICA_RIEGO_EQUIPO eq ON eq.id_caseta = cas.id
+        JOIN DIM_AREATECNICA_RIEGO_SECTOR s  ON s.id_equipo  = eq.id
+        JOIN PIVOT_AREATECNICA_RIEGO_SECTORCUARTEL psc ON psc.id_sector = s.id
+        JOIN FACT_AREATECNICA_FERTILIZACION_PROGRAMA prog ON prog.id_cuartel = psc.id_cuartel
+        JOIN DIM_GENERAL_SEMANASTEMPORADA sem ON sem.id = prog.semana
+        WHERE cas.id_sucursal = %s AND sem.etiqueta_semana = %s
+        ORDER BY cas.caseta
+    """
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(sql, (id_sucursal, etiqueta_semana))
+            return cur.fetchall()
+
+
+def get_caseta_info(id_caseta: int) -> dict | None:
+    """Devuelve {id, caseta, id_sucursal} o None."""
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT id, caseta, id_sucursal FROM DIM_AREATECNICA_RIEGO_CASETA WHERE id = %s",
+                (id_caseta,),
+            )
+            return cur.fetchone()
+
+
 def get_papeleta_campo_rows(etiqueta_semana: str, id_sucursal: int) -> list:
     """Trae todos los registros planos para armar la papeleta jerarquica por campo.
     Una fila = (caseta, equipo, sector, cuartel con sup del sector, producto con dosis).
