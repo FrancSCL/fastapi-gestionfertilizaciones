@@ -1206,6 +1206,7 @@ def get_productos_disponibles(id_cuartel: int, id_temporada: int | None = None) 
         SELECT
             p.id,
             p.nombre_comercial,
+            p.id_actividad,
             COALESCE(pn.n, 0)  AS n,
             COALESCE(pn.p, 0)  AS p,
             COALESCE(pn.k, 0)  AS k,
@@ -1216,13 +1217,13 @@ def get_productos_disponibles(id_cuartel: int, id_temporada: int | None = None) 
             COALESCE(pn.mn, 0) AS mn
         FROM DIM_AREATECNICA_FITO_PRODUCTO p
         LEFT JOIN DIM_AREATECNICA_FITO_PRODUCTONUTRIENTES pn ON pn.id_producto = p.id
-        WHERE p.id_actividad = 5
+        WHERE p.id_actividad IN ('5', '48')
           AND p.id NOT IN (
             SELECT DISTINCT id_producto
             FROM FACT_AREATECNICA_FERTILIZACION_PRODUCTOSPROGRAMA
             WHERE id_fertilizacion IN ({ph})
         )
-        ORDER BY p.nombre_comercial
+        ORDER BY p.id_actividad DESC, p.nombre_comercial
     """
     with get_connection() as conn:
         with conn.cursor() as cur:

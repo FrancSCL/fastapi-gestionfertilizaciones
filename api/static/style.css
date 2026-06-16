@@ -1521,6 +1521,48 @@ h4 { font-size: 0.875rem; text-transform: uppercase; letter-spacing: 0.04em; col
   transform: scale(1.04);
 }
 
+/* Chips de tipo (Todos / Fertilizantes / Abonos) */
+.add-prod-chip-tipo {
+  padding: 5px 12px;
+  background: white;
+  border: 1px solid var(--lh-200);
+  border-radius: 999px;
+  font-family: 'Archivo', system-ui, sans-serif;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--lh-700);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.add-prod-chip-tipo:hover {
+  border-color: var(--lh-400);
+  background: var(--lh-50);
+}
+
+.add-prod-chip-tipo.is-active {
+  background: var(--lh-700);
+  color: white;
+  border-color: var(--lh-800);
+}
+
+.add-prod-chip-sep {
+  display: inline-block;
+  width: 1px;
+  background: var(--border);
+  margin: 2px 6px;
+}
+
+.add-prod-card-sigla-abono {
+  background: var(--accent-100);
+  color: oklch(0.45 0.12 75);
+  font-family: 'Archivo', system-ui, sans-serif;
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 0.625rem;
+  font-weight: 600;
+}
+
 /* Grid de cards */
 .add-prod-grid {
   display: grid;

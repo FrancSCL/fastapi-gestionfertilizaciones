@@ -11,6 +11,10 @@
         <input type="text" id="addProdSearch" placeholder="Filtrar por nombre o por nutriente (N, K, NPK…)" autofocus>
       </div>
       <div class="add-prod-chip-nuts" id="addProdNutFilter">
+        <button type="button" class="add-prod-chip-tipo is-active" data-tipo="all">Todos</button>
+        <button type="button" class="add-prod-chip-tipo" data-tipo="5">Fertilizantes</button>
+        <button type="button" class="add-prod-chip-tipo" data-tipo="48">Abonos</button>
+        <span class="add-prod-chip-sep"></span>
         {% for letra in ['N','P','K','Mg','B','Ca','Zn','Mn'] %}
         <button type="button" class="add-prod-chip-nut" data-nut="{{ letra | lower }}">{{ letra }}</button>
         {% endfor %}
@@ -21,7 +25,8 @@
       {% for p in productos %}
       <label class="add-prod-card"
              data-name="{{ p.nombre_comercial | lower }}"
-             data-sigla="{{ p.sigla_nut | lower }}">
+             data-sigla="{{ p.sigla_nut | lower }}"
+             data-tipo="{{ p.id_actividad }}">
         <input type="checkbox" name="id_producto" value="{{ p.id }}" hidden>
         <span class="add-prod-card-tick" aria-hidden="true">
           <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor"
@@ -31,7 +36,9 @@
         </span>
         <span class="add-prod-card-body">
           <span class="add-prod-card-name">{{ p.nombre_comercial }}</span>
-          {% if p.sigla_nut %}
+          {% if p.id_actividad == '48' %}
+          <span class="add-prod-card-sigla add-prod-card-sigla-abono">Abono</span>
+          {% elif p.sigla_nut %}
           <span class="add-prod-card-sigla">{{ p.sigla_nut }}</span>
           {% else %}
           <span class="add-prod-card-sigla add-prod-card-sigla-empty">sin nut.</span>
@@ -39,7 +46,7 @@
         </span>
       </label>
       {% else %}
-      <div class="add-prod-empty">Todos los fertilizantes ya están en la matriz.</div>
+      <div class="add-prod-empty">Todos los productos disponibles ya están en la matriz.</div>
       {% endfor %}
     </div>
 
@@ -75,6 +82,7 @@
     const cards = Array.from(grid.querySelectorAll('.add-prod-card'));
     const activeNuts = new Set();
     let query = '';
+    let activeTipo = 'all';
 
     function renderSummary() {
       const sel = cards.filter(c => c.querySelector('input').checked);
@@ -105,10 +113,12 @@
       cards.forEach(c => {
         const name = c.dataset.name || '';
         const sigla = c.dataset.sigla || '';
+        const tipo = c.dataset.tipo || '';
         const nameHit = !query || name.includes(query) || sigla.includes(query);
         const nutHit = activeNuts.size === 0
           || Array.from(activeNuts).every(n => sigla.includes(n));
-        const visible = nameHit && nutHit;
+        const tipoHit = activeTipo === 'all' || tipo === activeTipo;
+        const visible = nameHit && nutHit && tipoHit;
         c.classList.toggle('hidden', !visible);
         if (visible) shown++;
       });
@@ -132,8 +142,17 @@
       applyFilter();
     });
 
-    // Chips de nutrientes
+    // Chips de tipo (Todos / Fertilizantes / Abonos) — single-select
     nutFilterBar.addEventListener('click', e => {
+      const tipoBtn = e.target.closest('.add-prod-chip-tipo');
+      if (tipoBtn) {
+        activeTipo = tipoBtn.dataset.tipo;
+        nutFilterBar.querySelectorAll('.add-prod-chip-tipo').forEach(b => {
+          b.classList.toggle('is-active', b === tipoBtn);
+        });
+        applyFilter();
+        return;
+      }
       const btn = e.target.closest('.add-prod-chip-nut');
       if (!btn) return;
       const nut = btn.dataset.nut;
