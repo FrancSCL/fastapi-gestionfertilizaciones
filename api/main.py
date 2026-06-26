@@ -795,6 +795,143 @@ def eliminar_semana(
     return RedirectResponse(url=url, status_code=303)
 
 
+@app.get("/app/matriz/{id_cuartel}/resumen-semanal/excel")
+def resumen_semanal_excel(
+    request: Request,
+    id_cuartel: int,
+    temporada: int | None = None,
+):
+    _require_cuartel_permitido(request, id_cuartel)
+    cuartel = get_cuartel_info(id_cuartel)
+    if not cuartel:
+        raise HTTPException(404, "Cuartel no encontrado")
+    semanas_rows = get_semanas_cuartel(id_cuartel, temporada)
+    ids_prog = [s["id_programa"] for s in semanas_rows]
+    productos_rows = get_productos_asignados(ids_prog)
+    matriz = build_matriz(semanas_rows, productos_rows)
+    ur = get_ur_cuartel(id_cuartel, temporada) if temporada else None
+
+    NUTRIENTES = ["N", "K", "P", "Mg", "B", "Ca", "Zn", "Mn"]
+    nuts_vistos = [n for n in NUTRIENTES if (matriz["totales_aporte"].get(n) or 0) > 0]
+    sup = float(cuartel.get("sup_productiva") or 0)
+
+    from io import BytesIO
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+
+    HDR_FILL = PatternFill("solid", fgColor="2d5a1f")
+    HDR_FONT = Font(bold=True, color="FFFFFF", size=10)
+    ZEBRA = PatternFill("solid", fgColor="F4FAF1")
+    TOTAL_FILL = PatternFill("solid", fgColor="D7E8C9")
+    EMPTY_FILL = PatternFill("solid", fgColor="F5F5F5")
+    THIN = Side(style="thin", color="C5D9BB")
+    BORDER = Border(left=THIN, right=THIN, top=THIN, bottom=THIN)
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Resumen semanal"
+
+    # Encabezado del cuartel
+    ws["A1"] = f"Resumen semanal — {cuartel.get('nombre') or cuartel.get('descripcion_ceco') or id_cuartel}"
+    ws["A1"].font = Font(bold=True, size=12, color="2d5a1f")
+    ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=5)
+    meta_parts = []
+    if cuartel.get("sucursal"): meta_parts.append(str(cuartel["sucursal"]))
+    if cuartel.get("variedad"): meta_parts.append(str(cuartel["variedad"]))
+    if sup > 0: meta_parts.append(f"{sup:.2f} ha")
+    if matriz.get("costo_ha_total"): meta_parts.append(f"${matriz['costo_ha_total']:.2f} USD/ha")
+    ws["A2"] = " · ".join(meta_parts)
+    ws["A2"].font = Font(italic=True, color="666666", size=9)
+    ws.merge_cells(start_row=2, start_column=1, end_row=2, end_column=8)
+
+    # Headers tabla (fila 4)
+    headers = ["Semana", "Etapa", "kg/ha"]
+    if sup > 0: headers.append("kg sup.")
+    headers.append("USD/ha")
+    headers.extend([f"{n} (un)" for n in nuts_vistos])
+
+    HEADER_ROW = 4
+    for col_idx, h in enumerate(headers, start=1):
+        cell = ws.cell(row=HEADER_ROW, column=col_idx, value=h)
+        cell.fill = HDR_FILL
+        cell.font = HDR_FONT
+        cell.alignment = Alignment(horizontal="center", vertical="center")
+        cell.border = BORDER
+
+    # Filas
+    row = HEADER_ROW + 1
+    for fila in matriz["filas"]:
+        sem = fila["semana"]
+        vacia = (fila.get("total_kg") or 0) <= 0
+        vals = [sem.get("etiqueta") or "", sem.get("etapa") or ""]
+        vals.append(round(fila.get("total_kg") or 0, 1) if not vacia else None)
+        if sup > 0:
+            vals.append(round((fila.get("total_kg") or 0) * sup, 1) if not vacia else None)
+        vals.append(round(fila.get("usd_ha") or 0, 2) if (fila.get("usd_ha") or 0) > 0 else None)
+        for n in nuts_vistos:
+            v = (fila.get("aporte") or {}).get(n) or 0
+            vals.append(round(v, 2) if v > 0.01 else None)
+        for col_idx, v in enumerate(vals, start=1):
+            cell = ws.cell(row=row, column=col_idx, value=v)
+            cell.border = BORDER
+            if col_idx >= 3:
+                cell.alignment = Alignment(horizontal="right")
+            if vacia:
+                cell.fill = EMPTY_FILL
+            elif row % 2 == 0:
+                cell.fill = ZEBRA
+        row += 1
+
+    # Total
+    total_row = row
+    total_vals = ["Total", ""]
+    total_kg = sum((f.get("total_kg") or 0) for f in matriz["filas"])
+    total_vals.append(round(total_kg, 1))
+    if sup > 0: total_vals.append(round(total_kg * sup, 1))
+    total_vals.append(round(matriz.get("costo_ha_total") or 0, 2))
+    for n in nuts_vistos:
+        total_vals.append(round(matriz["totales_aporte"].get(n) or 0, 2))
+    for col_idx, v in enumerate(total_vals, start=1):
+        cell = ws.cell(row=total_row, column=col_idx, value=v)
+        cell.fill = TOTAL_FILL
+        cell.font = Font(bold=True)
+        cell.border = BORDER
+        if col_idx >= 3:
+            cell.alignment = Alignment(horizontal="right")
+
+    # Fila req UR si existe
+    if ur and nuts_vistos:
+        req_row = total_row + 1
+        ws.cell(row=req_row, column=1, value="Requerimiento UR").font = Font(italic=True, color="666666", size=9)
+        offset = 3 + (1 if sup > 0 else 0) + 1  # primera col de nutrientes
+        for i, n in enumerate(nuts_vistos):
+            req = ur.get(f"unidades_{n}") or 0
+            if req:
+                cell = ws.cell(row=req_row, column=offset + i, value=round(float(req), 1))
+                cell.font = Font(italic=True, color="666666", size=9)
+                cell.alignment = Alignment(horizontal="right")
+                cell.border = BORDER
+
+    # Anchos columnas
+    widths = [14, 14, 10] + ([10] if sup > 0 else []) + [10] + [10] * len(nuts_vistos)
+    for col_idx, w in enumerate(widths, start=1):
+        ws.column_dimensions[ws.cell(row=HEADER_ROW, column=col_idx).column_letter].width = w
+    ws.freeze_panes = ws.cell(row=HEADER_ROW + 1, column=1).coordinate
+
+    buf = BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    nombre_cuartel = (cuartel.get("nombre") or cuartel.get("descripcion_ceco") or f"cuartel_{id_cuartel}")
+    safe = "".join(c if c.isalnum() else "_" for c in str(nombre_cuartel))[:40]
+    fn = f"resumen_semanal_{safe}.xlsx"
+    from fastapi.responses import StreamingResponse
+    return StreamingResponse(
+        buf,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="{fn}"'},
+    )
+
+
 # ── Parámetros ────────────────────────────────────────────────────────────────
 
 @app.get("/app/parametros", response_class=HTMLResponse)
