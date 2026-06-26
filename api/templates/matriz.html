@@ -180,6 +180,24 @@
     <div id="add-prod-panel" style="margin-bottom:var(--sp-3);"></div>
 
     {% if matriz.semanas %}
+    <!-- Switch de vista: Matriz dosis / Resumen semanal -->
+    <div class="vista-toggle" role="tablist" style="margin-bottom:var(--sp-3);">
+      <button type="button" class="vista-toggle-btn is-active" data-vista="matriz" role="tab">
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
+          <rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
+        </svg>
+        Matriz dosis
+      </button>
+      <button type="button" class="vista-toggle-btn" data-vista="semanal" role="tab">
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/>
+        </svg>
+        Resumen semanal
+      </button>
+    </div>
+
+    <div class="vista-pane vista-matriz" data-vista="matriz">
     <div class="matriz-wrap">
       <table class="matriz-table">
         <thead>
@@ -278,6 +296,93 @@
       </div>
       {% endif %}
     </div>
+    </div><!-- /vista-matriz -->
+
+    {% if matriz.productos %}
+    {% set nuts_vistos = [] %}
+    {% for nut, total in matriz.totales_aporte.items() if total > 0 %}{% set _ = nuts_vistos.append(nut) %}{% endfor %}
+    <div class="vista-pane vista-semanal" data-vista="semanal" style="display:none;">
+      <div class="resumen-meta">
+        <span><strong>{{ matriz.semanas | length }}</strong> semanas</span>
+        <span class="resumen-sep">·</span>
+        <span>Total <strong>{{ '%.1f' | format(matriz.totales_prod | sum) }} kg/ha</strong></span>
+        {% if cuartel.sup_productiva %}
+        <span class="resumen-sep">·</span>
+        <span><strong>{{ '%.0f' | format((matriz.totales_prod | sum) * (cuartel.sup_productiva | float)) }}</strong> kg sup.</span>
+        {% endif %}
+        {% if matriz.costo_ha_total and matriz.costo_ha_total > 0 %}
+        <span class="resumen-sep">·</span>
+        <span class="resumen-usd"><strong>${{ '%.2f' | format(matriz.costo_ha_total) }}</strong> USD/ha</span>
+        {% endif %}
+      </div>
+
+      <div class="resumen-table-wrap">
+        <table class="resumen-table">
+          <thead>
+            <tr>
+              <th class="resumen-th-sticky">Semana</th>
+              <th>Etapa</th>
+              <th class="num">kg/ha</th>
+              {% if cuartel.sup_productiva %}<th class="num">kg sup.</th>{% endif %}
+              <th class="num">USD/ha</th>
+              {% for nut in nuts_vistos %}
+              <th class="num resumen-th-nut">{{ nut }} (un)</th>
+              {% endfor %}
+            </tr>
+          </thead>
+          <tbody>
+            {% for fila in matriz.filas %}
+            {% set vacia = (fila.total_kg or 0) <= 0 %}
+            <tr {% if vacia %}class="resumen-row-empty"{% endif %}>
+              <th class="resumen-th-sticky">{{ fila.semana.etiqueta }}</th>
+              <td>{% if fila.semana.etapa %}<span class="resumen-etapa">{{ fila.semana.etapa }}</span>{% else %}—{% endif %}</td>
+              <td class="num">{{ '%.1f' | format(fila.total_kg or 0) if not vacia else '—' }}</td>
+              {% if cuartel.sup_productiva %}
+              <td class="num resumen-td-muted">{{ '%.0f' | format((fila.total_kg or 0) * (cuartel.sup_productiva | float)) if not vacia else '—' }}</td>
+              {% endif %}
+              <td class="num resumen-td-muted">{{ '$%.2f' | format(fila.usd_ha) if fila.usd_ha and fila.usd_ha > 0 else '—' }}</td>
+              {% for nut in nuts_vistos %}
+              <td class="num">
+                {% set v = fila.aporte[nut] %}
+                {% if v and v > 0.01 %}{{ '%.1f' | format(v) }}{% else %}<span class="resumen-dash">—</span>{% endif %}
+              </td>
+              {% endfor %}
+            </tr>
+            {% endfor %}
+          </tbody>
+          <tfoot>
+            <tr class="resumen-total">
+              <th class="resumen-th-sticky">Total</th>
+              <td></td>
+              <td class="num"><strong>{{ '%.1f' | format(matriz.totales_prod | sum) }}</strong></td>
+              {% if cuartel.sup_productiva %}
+              <td class="num"><strong>{{ '%.0f' | format((matriz.totales_prod | sum) * (cuartel.sup_productiva | float)) }}</strong></td>
+              {% endif %}
+              <td class="num"><strong class="resumen-usd">${{ '%.2f' | format(matriz.costo_ha_total or 0) }}</strong></td>
+              {% for nut in nuts_vistos %}
+              <td class="num">
+                <strong>{{ '%.1f' | format(matriz.totales_aporte[nut]) }}</strong>
+                {% if ur %}
+                  {% set req_key = 'unidades_' ~ nut %}
+                  {% set req = ur[req_key] %}
+                  {% if req and req > 0 %}
+                  <div class="resumen-req">req {{ '%.0f' | format(req) }}</div>
+                  {% endif %}
+                {% endif %}
+              </td>
+              {% endfor %}
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+
+      {% if ur and nuts_vistos %}
+      <p class="resumen-hint">
+        Aporte real = kg/ha × % nutriente del producto. El número pequeño abajo del total es el requerimiento (UR) por nutriente.
+      </p>
+      {% endif %}
+    </div>
+    {% endif %}
     {% else %}
     <div class="empty-state">
       <svg class="empty-state-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
@@ -294,6 +399,18 @@
 </div>
 
 <script>
+// Toggle vista Matriz / Resumen semanal
+(function() {
+  const btns = document.querySelectorAll('.vista-toggle-btn');
+  const panes = document.querySelectorAll('.vista-pane');
+  if (!btns.length) return;
+  btns.forEach(b => b.addEventListener('click', () => {
+    const v = b.dataset.vista;
+    btns.forEach(x => x.classList.toggle('is-active', x === b));
+    panes.forEach(p => p.style.display = p.dataset.vista === v ? '' : 'none');
+  }));
+})();
+
 (function() {
   const sup = {{ cuartel.sup_productiva | float }};
 

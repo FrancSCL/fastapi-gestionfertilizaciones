@@ -3618,3 +3618,124 @@ h4 { font-size: 0.875rem; text-transform: uppercase; letter-spacing: 0.04em; col
   display: flex;
   justify-content: flex-end;
 }
+
+/* ── Toggle vista Matriz/Resumen ─────────────────────────────────────────── */
+.vista-toggle {
+  display: inline-flex;
+  gap: 2px;
+  padding: 3px;
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+.vista-toggle-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  font-family: inherit;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+.vista-toggle-btn:hover {
+  color: var(--text-primary);
+}
+.vista-toggle-btn.is-active {
+  background: var(--n-100);
+  color: var(--lh-800);
+  font-weight: 600;
+}
+
+/* ── Resumen semanal ─────────────────────────────────────────────────────── */
+.resumen-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--sp-2);
+  margin-bottom: var(--sp-3);
+  font-size: 0.8125rem;
+  color: var(--text-secondary);
+}
+.resumen-meta strong { color: var(--text-primary); font-weight: 600; }
+.resumen-meta .resumen-sep { color: var(--n-300); user-select: none; }
+.resumen-meta .resumen-usd strong { color: var(--lh-700); }
+
+.resumen-table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-raised);
+}
+.resumen-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8125rem;
+}
+.resumen-table thead th {
+  background: var(--n-100);
+  text-align: left;
+  font-weight: 600;
+  font-size: 0.6875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-secondary);
+  padding: var(--sp-2) var(--sp-3);
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+.resumen-table thead th.num,
+.resumen-table tbody td.num,
+.resumen-table tfoot td.num,
+.resumen-table tfoot th.num { text-align: right; font-variant-numeric: tabular-nums; }
+.resumen-th-sticky { position: sticky; left: 0; background: var(--n-100); z-index: 2; }
+.resumen-table tbody td,
+.resumen-table tbody th {
+  padding: var(--sp-2) var(--sp-3);
+  border-bottom: 1px solid var(--border-subtle);
+  vertical-align: middle;
+}
+.resumen-table tbody th.resumen-th-sticky { background: var(--surface-raised); font-weight: 600; color: var(--text-primary); }
+.resumen-row-empty { opacity: 0.5; }
+.resumen-etapa {
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 0.6875rem;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  text-transform: uppercase;
+}
+.resumen-td-muted { color: var(--text-muted); }
+.resumen-dash { color: var(--n-300); }
+.resumen-table tfoot tr.resumen-total td,
+.resumen-table tfoot tr.resumen-total th {
+  background: var(--n-100);
+  border-top: 2px solid var(--border);
+  padding: var(--sp-3);
+}
+.resumen-table tfoot tr.resumen-total th { background: var(--n-100); }
+.resumen-req {
+  font-size: 0.625rem;
+  font-weight: 400;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+.resumen-hint {
+  margin-top: var(--sp-2);
+  font-size: 0.6875rem;
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+
+/* ── Sticky thead Ajuste nutricional ─────────────────────────────────────── */
+.aa-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  background: var(--n-100);
+  box-shadow: inset 0 -1px 0 var(--border);
+}
