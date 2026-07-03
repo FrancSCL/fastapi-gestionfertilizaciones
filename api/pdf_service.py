@@ -21,9 +21,32 @@ def _fmt(val, decimals=1) -> str:
     return f"{float(val):,.{decimals}f}"
 
 
+def _sacos_calc(total_kg: float) -> float:
+    """Sacos con regla: si >10 aproxima al entero (corte .4 sube, <.4 baja);
+    si <=10 deja con 1 decimal para que el casetero mida en fracciones."""
+    if total_kg is None or total_kg <= 0:
+        return 0
+    sacos = total_kg / PESO_ENVASE_KG
+    if sacos > 10:
+        entero = int(sacos)
+        decimal = sacos - entero
+        return float(entero + 1 if decimal >= 0.4 else entero)
+    return round(sacos, 1)
+
+
+def _sacos_fmt(total_kg: float) -> str:
+    """Formatea sacos como string listo para renderizar en el PDF.
+    Enteros van sin decimal (12), fraccionarios con 1 decimal (8.8)."""
+    n = _sacos_calc(total_kg)
+    if n == 0:
+        return "0"
+    if float(n).is_integer():
+        return str(int(n))
+    return f"{n:.1f}"
+
+
 def _sacos_label(total: float) -> str:
-    n = math.ceil(total / PESO_ENVASE_KG)
-    return f"{n} sacos"
+    return f"{_sacos_fmt(total)} sacos"
 
 
 def build_pdf(programa: dict, productos: list, sectores: list) -> bytes:
@@ -55,7 +78,7 @@ def build_pdf(programa: dict, productos: list, sectores: list) -> bytes:
 
     # ── Totales globales ──────────────────────────────────────────────────────
     total_kg_global  = sum(p["total_raw"] for p in enriched_productos)
-    total_sacos_global = math.ceil(total_kg_global / PESO_ENVASE_KG)
+    total_sacos_global = _sacos_fmt(total_kg_global)
 
     # ── Plan por sector × producto ────────────────────────────────────────────
     plan_rows = []
@@ -88,7 +111,7 @@ def build_pdf(programa: dict, productos: list, sectores: list) -> bytes:
         for s in sectores
         for p in enriched_productos
     )
-    total_sacos_sectores = math.ceil(total_kg_sectores / PESO_ENVASE_KG)
+    total_sacos_sectores = _sacos_fmt(total_kg_sectores)
 
     # ── Número de orden y período ─────────────────────────────────────────────
     semana_label = programa.get("etiqueta_semana") or str(programa.get("semana_calendario", ""))
@@ -178,7 +201,7 @@ def _bodega_secciones(programas: list, productos_map: dict, sectores_map: dict, 
                     total = dosis * sec_sup
                     cantidades[prod_name] = {
                         "total_fmt": _fmt(total, 1),
-                        "sacos":     math.ceil(total / PESO_ENVASE_KG) if total > 0 else 0,
+                        "sacos":     _sacos_fmt(total),
                     } if dosis > 0 else None
                     sub_cuartel[prod_name] += total
 
@@ -193,11 +216,11 @@ def _bodega_secciones(programas: list, productos_map: dict, sectores_map: dict, 
                     "cantidades": cantidades,
                 })
 
-            # acumular en variedad y global
+            # acumular en variedad y global (solo kg; sacos se recalcula al final
+            # sobre el total, para que la regla >10 aplique al agregado)
             for prod_name, val in sub_cuartel.items():
                 total_var[prod_name] += val
                 resumen_global[prod_name]["total"] += val
-                resumen_global[prod_name]["sacos"] += math.ceil(val / PESO_ENVASE_KG) if val > 0 else 0
 
             # fila subtotal por cuartel (solo versión pro)
             if pro and n_sec > 1:
@@ -207,7 +230,7 @@ def _bodega_secciones(programas: list, productos_map: dict, sectores_map: dict, 
                     "cantidades": {
                         p: {
                             "total_fmt": _fmt(sub_cuartel[p], 1),
-                            "sacos":     math.ceil(sub_cuartel[p] / PESO_ENVASE_KG) if sub_cuartel[p] > 0 else 0,
+                            "sacos":     _sacos_fmt(sub_cuartel[p]),
                         } if sub_cuartel[p] > 0 else None
                         for p in prod_set
                     },
@@ -219,7 +242,7 @@ def _bodega_secciones(programas: list, productos_map: dict, sectores_map: dict, 
             total_var_row = {
                 p: {
                     "total_fmt": _fmt(total_var[p], 1),
-                    "sacos":     math.ceil(total_var[p] / PESO_ENVASE_KG) if total_var[p] > 0 else 0,
+                    "sacos":     _sacos_fmt(total_var[p]),
                 } if total_var[p] > 0 else None
                 for p in prod_set
             }
@@ -231,13 +254,18 @@ def _bodega_secciones(programas: list, productos_map: dict, sectores_map: dict, 
             "total_var_row": total_var_row,
         })
 
+    # Recalcular sacos del resumen global sobre el kg total agregado,
+    # para que la regla >10 aplique a la suma completa (no a cada sector)
+    for prod_name, info in resumen_global.items():
+        info["sacos"] = _sacos_fmt(info["total"])
+
     return secciones, resumen_global
 
 
 def _agg(d: dict, key: str, kg: float) -> None:
     e = d.setdefault(key, {"kg": 0.0, "sacos": 0})
     e["kg"] += kg
-    e["sacos"] = math.ceil(e["kg"] / PESO_ENVASE_KG) if e["kg"] > 0 else 0
+    e["sacos"] = _sacos_fmt(e["kg"])
 
 
 def build_pdf_campo(
@@ -310,7 +338,7 @@ def build_pdf_campo(
         # pero dosis 0 esta semana). Umbral 0.05 = lo que se redondea a "0.0".
         if kg < 0.05:
             continue
-        sacos = math.ceil(kg / PESO_ENVASE_KG) if kg > 0 else 0
+        sacos = _sacos_fmt(kg)
 
         pct_n = round(float(r.get("pct_n") or 0) * 100)
         pct_p = round(float(r.get("pct_p") or 0) * 100)
@@ -417,7 +445,7 @@ def build_pdf_campo(
                 "nombre": r["producto"],
                 "dosis_fmt": _fmt(dosis, 1),
                 "kg_fmt": _fmt(kg, 1),
-                "sacos": math.ceil(kg / PESO_ENVASE_KG) if kg > 0 else 0,
+                "sacos": _sacos_fmt(kg),
             })
             _agg(totales_campo, r["producto"], kg)
     # Podar huerfanos sin productos
@@ -429,7 +457,7 @@ def build_pdf_campo(
         for k, v in sorted(totales_campo.items())
     ]
     total_kg_campo = sum(v["kg"] for v in totales_campo.values())
-    total_sacos_campo = sum(v["sacos"] for v in totales_campo.values())
+    total_sacos_campo = _sacos_fmt(total_kg_campo)
 
     # Periodo y numero de orden
     fi = semana.get("fecha_inicio") if semana else None
@@ -457,7 +485,7 @@ def build_pdf_campo(
             "nombre": p["nombre"],
             "npk": p["npk"],
             "kg_fmt": _fmt(kg, 1),
-            "sacos": math.ceil(kg / PESO_ENVASE_KG) if kg > 0 else 0,
+            "sacos": _sacos_fmt(kg),
         })
 
     # Especie / etapa resumidas
