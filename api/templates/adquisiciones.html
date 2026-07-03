@@ -103,7 +103,11 @@
       <tfoot>
         <tr class="adq-total-row">
           <td colspan="3">TOTAL</td>
-          <td class="num">{{ '%.2f' | format(total_kg) }}</td>
+          <td class="num">
+            {% for uni, tot in totales_por_unidad.items() %}
+              {{ '%.2f' | format(tot) }} <span class="matriz-unit">{{ uni }}</span>{% if not loop.last %}<br>{% endif %}
+            {% endfor %}
+          </td>
           <td></td>
           <td class="num">{{ '%.2f' | format(total_usd) }} USD</td>
         </tr>

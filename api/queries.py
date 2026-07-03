@@ -286,17 +286,22 @@ def build_matriz(semanas_rows: list, productos_rows: list) -> dict:
 
     # filas = semanas, celdas = una por producto (0 si no asignado)
     filas = []
+    totales_por_unidad_global: dict = {}
     for sem in semanas_list:
         fila = {"semana": sem, "celdas": []}
-        total_kg = 0.0
+        total_kg = 0.0  # suma cruda (kg y L mezclados) — mantener por compat
         usd = 0.0
         aporte_sem = {nut: 0.0 for nut in _NUTRIENTES}
+        por_unidad: dict = {}  # {'kg': X, 'L': Y}
         for prod in productos_list:
             val = celdas.get((sem["id_programa"], prod["id"]))
             fila["celdas"].append(val)
             if val:
                 total_kg += val
                 usd += val * float(prod.get("precio_usd") or 0)
+                uni = (prod.get("unidad") or "kg")
+                por_unidad[uni] = por_unidad.get(uni, 0) + val
+                totales_por_unidad_global[uni] = totales_por_unidad_global.get(uni, 0) + val
                 for nut in _NUTRIENTES:
                     pct = prod["pct"][nut]
                     if pct > 0:
@@ -304,6 +309,7 @@ def build_matriz(semanas_rows: list, productos_rows: list) -> dict:
         fila["total_kg"] = round(total_kg, 2)
         fila["usd_ha"] = round(usd, 2)
         fila["aporte"] = {nut: round(v, 2) for nut, v in aporte_sem.items()}
+        fila["por_unidad"] = {u: round(v, 2) for u, v in por_unidad.items()}
         filas.append(fila)
 
     # totales kg/ha por producto
@@ -345,6 +351,7 @@ def build_matriz(semanas_rows: list, productos_rows: list) -> dict:
         "costo_ha_total": costo_ha_total,
         "unidades_por_nut": unidades_por_nut,
         "totales_aporte": totales_aporte,
+        "totales_por_unidad": {u: round(v, 2) for u, v in totales_por_unidad_global.items()},
     }
 
 

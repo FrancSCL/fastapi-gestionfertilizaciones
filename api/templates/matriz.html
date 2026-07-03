@@ -95,12 +95,13 @@
           <tr class="prod-summary-name-row">
             <th colspan="2">{{ prod.nombre }}</th>
           </tr>
+          {% set uni = prod.unidad or 'kg' %}
           <tr class="prod-summary-kg-row">
-            <th>kg/ha</th>
+            <th>{{ uni }}/ha</th>
             <td data-kg-ha>{{ '%.1f' | format(kg_ha) }}</td>
           </tr>
           <tr class="prod-summary-kg-row">
-            <th>kg/sup</th>
+            <th>{{ uni }}/sup</th>
             <td data-kg-sup>{{ '%.1f' | format(kg_sup) }}</td>
           </tr>
           {% if precio > 0 %}
@@ -267,16 +268,18 @@
         {% if matriz.productos %}
         <tfoot>
           <tr class="matriz-tfoot matriz-tfoot-kg">
-            <th class="matriz-corner">Total kg/ha</th>
+            <th class="matriz-corner">Total dosis/ha</th>
             {% for t in matriz.totales_prod %}
-            <td class="matriz-cell">{{ '%.1f' | format(t) }}</td>
+            {% set uni = matriz.productos[loop.index0].unidad or 'kg' %}
+            <td class="matriz-cell">{{ '%.1f' | format(t) }} <span class="matriz-unit">{{ uni }}</span></td>
             {% endfor %}
           </tr>
-          <tr class="matriz-tfoot matriz-tfoot-bloque" title="kg totales según superficie productiva">
-            <th class="matriz-corner">Total kg/supprod</th>
+          <tr class="matriz-tfoot matriz-tfoot-bloque" title="Total según superficie productiva">
+            <th class="matriz-corner">Total superficie</th>
             {% for t in matriz.totales_prod %}
+            {% set uni = matriz.productos[loop.index0].unidad or 'kg' %}
             <td class="matriz-cell">
-              {{ '%.1f' | format(t * (cuartel.sup_productiva | float)) }}
+              {{ '%.1f' | format(t * (cuartel.sup_productiva | float)) }} <span class="matriz-unit">{{ uni }}</span>
             </td>
             {% endfor %}
           </tr>
@@ -315,10 +318,19 @@
       <div class="resumen-meta">
         <span><strong>{{ matriz.semanas | length }}</strong> semanas</span>
         <span class="resumen-sep">·</span>
-        <span>Total <strong>{{ '%.1f' | format(matriz.totales_prod | sum) }} kg/ha</strong></span>
+        <span>Total
+          {% for uni, tot in matriz.totales_por_unidad.items() %}
+            <strong>{{ '%.1f' | format(tot) }} {{ uni }}/ha</strong>{% if not loop.last %} + {% endif %}
+          {% endfor %}
+        </span>
         {% if cuartel.sup_productiva %}
         <span class="resumen-sep">·</span>
-        <span><strong>{{ '%.0f' | format((matriz.totales_prod | sum) * (cuartel.sup_productiva | float)) }}</strong> kg sup.</span>
+        <span>
+          {% for uni, tot in matriz.totales_por_unidad.items() %}
+            <strong>{{ '%.0f' | format(tot * (cuartel.sup_productiva | float)) }} {{ uni }}</strong>{% if not loop.last %} + {% endif %}
+          {% endfor %}
+          <span class="resumen-td-muted">sup.</span>
+        </span>
         {% endif %}
         {% if matriz.costo_ha_total and matriz.costo_ha_total > 0 %}
         <span class="resumen-sep">·</span>
@@ -332,8 +344,8 @@
             <tr>
               <th class="resumen-th-sticky">Semana</th>
               <th>Etapa</th>
-              <th class="num">kg/ha</th>
-              {% if cuartel.sup_productiva %}<th class="num">kg sup.</th>{% endif %}
+              <th class="num">Dosis/ha</th>
+              {% if cuartel.sup_productiva %}<th class="num">Por sup.</th>{% endif %}
               <th class="num">USD/ha</th>
               {% for nut in nuts_vistos %}
               <th class="num resumen-th-nut">{{ nut }} (un)</th>
@@ -346,9 +358,23 @@
             <tr {% if vacia %}class="resumen-row-empty"{% endif %}>
               <th class="resumen-th-sticky">{{ fila.semana.etiqueta }}</th>
               <td>{% if fila.semana.etapa %}<span class="resumen-etapa">{{ fila.semana.etapa }}</span>{% else %}—{% endif %}</td>
-              <td class="num">{{ '%.1f' | format(fila.total_kg or 0) if not vacia else '—' }}</td>
+              <td class="num">
+                {% if vacia %}—
+                {% else %}
+                  {% for uni, tot in fila.por_unidad.items() %}
+                    {{ '%.1f' | format(tot) }} <span class="resumen-unit">{{ uni }}</span>{% if not loop.last %}<br>{% endif %}
+                  {% endfor %}
+                {% endif %}
+              </td>
               {% if cuartel.sup_productiva %}
-              <td class="num resumen-td-muted">{{ '%.0f' | format((fila.total_kg or 0) * (cuartel.sup_productiva | float)) if not vacia else '—' }}</td>
+              <td class="num resumen-td-muted">
+                {% if vacia %}—
+                {% else %}
+                  {% for uni, tot in fila.por_unidad.items() %}
+                    {{ '%.0f' | format(tot * (cuartel.sup_productiva | float)) }} <span class="resumen-unit">{{ uni }}</span>{% if not loop.last %}<br>{% endif %}
+                  {% endfor %}
+                {% endif %}
+              </td>
               {% endif %}
               <td class="num resumen-td-muted">{{ '$%.2f' | format(fila.usd_ha) if fila.usd_ha and fila.usd_ha > 0 else '—' }}</td>
               {% for nut in nuts_vistos %}
@@ -364,9 +390,17 @@
             <tr class="resumen-total">
               <th class="resumen-th-sticky">Total</th>
               <td></td>
-              <td class="num"><strong>{{ '%.1f' | format(matriz.totales_prod | sum) }}</strong></td>
+              <td class="num">
+                {% for uni, tot in matriz.totales_por_unidad.items() %}
+                  <strong>{{ '%.1f' | format(tot) }}</strong> <span class="resumen-unit">{{ uni }}</span>{% if not loop.last %}<br>{% endif %}
+                {% endfor %}
+              </td>
               {% if cuartel.sup_productiva %}
-              <td class="num"><strong>{{ '%.0f' | format((matriz.totales_prod | sum) * (cuartel.sup_productiva | float)) }}</strong></td>
+              <td class="num">
+                {% for uni, tot in matriz.totales_por_unidad.items() %}
+                  <strong>{{ '%.0f' | format(tot * (cuartel.sup_productiva | float)) }}</strong> <span class="resumen-unit">{{ uni }}</span>{% if not loop.last %}<br>{% endif %}
+                {% endfor %}
+              </td>
               {% endif %}
               <td class="num"><strong class="resumen-usd">${{ '%.2f' | format(matriz.costo_ha_total or 0) }}</strong></td>
               {% for nut in nuts_vistos %}

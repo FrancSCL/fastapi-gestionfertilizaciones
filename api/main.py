@@ -844,9 +844,10 @@ def resumen_semanal_excel(
     ws["A2"].font = Font(italic=True, color="666666", size=9)
     ws.merge_cells(start_row=2, start_column=1, end_row=2, end_column=8)
 
-    # Headers tabla (fila 4)
-    headers = ["Semana", "Etapa", "kg/ha"]
-    if sup > 0: headers.append("kg sup.")
+    # Headers tabla (fila 4). Unidad neutra porque puede haber kg + L mezclados.
+    unidades_str = " + ".join(sorted((matriz.get("totales_por_unidad") or {}).keys())) or "kg"
+    headers = ["Semana", "Etapa", f"Dosis/ha ({unidades_str})"]
+    if sup > 0: headers.append(f"Cantidad sup. ({unidades_str})")
     headers.append("USD/ha")
     headers.extend([f"{n} (un)" for n in nuts_vistos])
 
@@ -1449,7 +1450,7 @@ def descargar_descuento_bodega_excel(
         "Semana", "Fecha inicio", "Fecha fin",
         "Sucursal", "Cuartel (CECO id)", "Cuartel", "Variedad",
         "Sup. ha", "Producto", "Cód. Softland", "Unidad",
-        "Dosis kg/ha", "Cantidad total",
+        "Dosis/ha", "Cantidad total",
     ]
     ws1.append(headers)
     for cell in ws1[1]:
@@ -1547,6 +1548,7 @@ def web_adquisiciones(
     filas = []
     total_kg = 0.0
     total_usd = 0.0
+    totales_por_unidad: dict = {}
     if id_temp:
         filas = get_adquisiciones_consolidado(
             id_temporada=id_temp,
@@ -1559,6 +1561,8 @@ def web_adquisiciones(
             f["subtotal_usd"] = round(kg * float(f.get("precio_usd") or 0), 2)
             total_kg += kg
             total_usd += f["subtotal_usd"]
+            uni = f.get("unidad") or "kg"
+            totales_por_unidad[uni] = totales_por_unidad.get(uni, 0) + kg
 
     return templates.TemplateResponse(
         "adquisiciones.html",
@@ -1570,6 +1574,7 @@ def web_adquisiciones(
             "filas": filas,
             "total_kg": round(total_kg, 2),
             "total_usd": round(total_usd, 2),
+            "totales_por_unidad": {u: round(v, 2) for u, v in totales_por_unidad.items()},
             "filtro_temporada": id_temp,
             "filtro_sucursal": id_suc,
             "filtro_semana_desde": semana_desde_id,

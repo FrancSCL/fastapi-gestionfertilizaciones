@@ -3763,3 +3763,12 @@ h4 { font-size: 0.875rem; text-transform: uppercase; letter-spacing: 0.04em; col
   margin-bottom: var(--sp-3);
 }
 .resumen-actions .filter-btn { text-decoration: none; }
+
+/* Unidad tipo "kg"/"L" pequeña junto a valores numéricos */
+.matriz-unit,
+.resumen-unit {
+  font-size: 0.6875rem;
+  font-weight: 500;
+  color: var(--text-muted);
+  margin-left: 2px;
+}
