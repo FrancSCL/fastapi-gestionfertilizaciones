@@ -72,7 +72,9 @@ def listar_cuarteles_con_programas(
             suc.id                      AS id_sucursal,
             suc.sucursal                AS sucursal,
             COUNT(prog.id)              AS num_programas,
-            MAX(CASE WHEN ur.id IS NOT NULL THEN 1 ELSE 0 END) AS tiene_ur
+            MAX(CASE WHEN ur.id IS NOT NULL THEN 1 ELSE 0 END) AS tiene_ur,
+            MAX(vig.vigor)              AS vigor,
+            MAX(vig.factor)             AS vigor_factor
         FROM FACT_AREATECNICA_FERTILIZACION_PROGRAMA prog
         JOIN DIM_GENERAL_CECO             ceco ON ceco.id = prog.id_cuartel
         JOIN DIM_GENERAL_SUCURSAL         suc  ON suc.id  = ceco.id_sucursal
@@ -81,6 +83,8 @@ def listar_cuarteles_con_programas(
         LEFT JOIN DIM_GENERAL_PORTAINJERTO port ON port.id = ceco.portainjerto
         LEFT JOIN FACT_AREATECNICA_FERTILIZACION_UNIDADESREQUERIDAS ur
                   ON ur.id_cuartel = ceco.id {ur_cond}
+        LEFT JOIN DIM_AREATECNICA_FERTILIZACION_VIGOR vig
+                  ON vig.id = ur.id_vigor
         {where_sql}
         GROUP BY ceco.id, ceco.descripcion_ceco, var.id, var.variedad,
                  esp.id, esp.especie, port.portainjerto,

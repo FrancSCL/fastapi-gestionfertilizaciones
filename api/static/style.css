@@ -667,6 +667,14 @@ h4 { font-size: 0.875rem; text-transform: uppercase; letter-spacing: 0.04em; col
   color: oklch(0.45 0.10 75);
 }
 
+.tag-vigor {
+  background: var(--lh-100);
+  color: var(--lh-800);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-size: 0.6875rem;
+}
+
 /* Sup badge */
 .sup-value {
   font-variant-numeric: tabular-nums;
@@ -830,7 +838,9 @@ h4 { font-size: 0.875rem; text-transform: uppercase; letter-spacing: 0.04em; col
 
 .matriz-week {
   text-align: center;
-  min-width: 120px;
+  min-width: 90px;
+  max-width: 110px;
+  vertical-align: bottom;
   font-size: 0.75rem;
   letter-spacing: 0.01em;
   padding: var(--sp-2) var(--sp-2) !important;
@@ -838,21 +848,26 @@ h4 { font-size: 0.875rem; text-transform: uppercase; letter-spacing: 0.04em; col
 
 .matriz-week-head {
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   justify-content: center;
   gap: 4px;
   position: relative;
+  min-height: 44px;
 }
 
 .matriz-week-name {
+  flex: 1 1 auto;
+  min-width: 0;
   font-weight: 700;
   color: var(--lh-900);
   text-transform: none;
   letter-spacing: 0;
   font-size: 0.75rem;
-  line-height: 1.15;
+  line-height: 1.1;
   text-align: center;
-  max-width: 120px;
+  max-width: 90px;
+  white-space: normal;
+  word-break: break-word;
   overflow-wrap: break-word;
   hyphens: auto;
 }
@@ -2026,11 +2041,13 @@ h4 { font-size: 0.875rem; text-transform: uppercase; letter-spacing: 0.04em; col
 }
 
 .prod-balance-table .is-falta {
-  color: #b91c1c;
+  color: #dc2626;
+  font-weight: 700;
 }
 
 .prod-balance-table .is-sobra {
   color: #b45309;
+  font-weight: 600;
 }
 
 .prod-balance-table .is-ok {

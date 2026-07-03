@@ -63,6 +63,7 @@
             <th>Portainjerto</th>
             <th class="num">Sup. Productiva</th>
             <th class="num">Semanas</th>
+            <th>Vigor</th>
             <th>Estado</th>
             <th></th>
           </tr>
@@ -82,6 +83,13 @@
             </td>
             <td class="num">
               <span class="sup-value">{{ c.num_programas }}</span>
+            </td>
+            <td>
+              {% if c.vigor %}
+                <span class="tag tag-vigor" title="Factor {{ c.vigor_factor }}">{{ c.vigor }}</span>
+              {% else %}
+                <span class="sup-unit">—</span>
+              {% endif %}
             </td>
             <td>
               {% if c.tiene_ur %}

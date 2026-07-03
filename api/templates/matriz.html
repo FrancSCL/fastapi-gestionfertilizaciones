@@ -70,7 +70,7 @@
             <td>{{ '%.1f' | format(req) }}</td>
             <td data-prog-val>{{ '%.1f' | format(prog) }}</td>
             <td data-saldo-val class="{% if saldo > 0.05 %}is-falta{% elif saldo < -0.05 %}is-sobra{% else %}is-ok{% endif %}">
-              {{ '%.1f' | format(saldo) }}
+              {% if saldo < -0.05 %}+{{ '%.1f' | format(-saldo) }}{% else %}{{ '%.1f' | format(saldo) }}{% endif %}
             </td>
           </tr>
           {% endfor %}
@@ -514,7 +514,9 @@
       const tdSaldo = tr.querySelector('[data-saldo-val]');
       if (tdProg) tdProg.textContent = prog.toFixed(1);
       if (tdSaldo) {
-        tdSaldo.textContent = saldo.toFixed(1);
+        tdSaldo.textContent = saldo < -0.05
+          ? '+' + Math.abs(saldo).toFixed(1)
+          : saldo.toFixed(1);
         tdSaldo.classList.remove('is-falta','is-sobra','is-ok');
         if (saldo > 0.05) tdSaldo.classList.add('is-falta');
         else if (saldo < -0.05) tdSaldo.classList.add('is-sobra');

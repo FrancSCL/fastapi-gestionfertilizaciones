@@ -1533,7 +1533,6 @@ def web_adquisiciones(
     semana_desde: str | None = None,
     semana_hasta: str | None = None,
 ):
-    _require_admin(request)
     temporada_id = _to_int(temporada)
     sucursal_id = _to_int(sucursal)
     semana_desde_id = _to_int(semana_desde)
@@ -1587,7 +1586,6 @@ def descargar_adquisiciones_excel(
     semana_desde: str | None = None,
     semana_hasta: str | None = None,
 ):
-    _require_admin(request)
     temporada_id = _to_int(temporada)
     sucursal_id = _to_int(sucursal)
     semana_desde_id = _to_int(semana_desde)
