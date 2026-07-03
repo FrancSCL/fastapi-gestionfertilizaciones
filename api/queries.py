@@ -420,15 +420,17 @@ def get_estimaciones_cuartel(id_cuartel: int) -> list:
 
 
 def get_ur_cuartel(id_cuartel: int, id_temporada: int | None = None) -> dict | None:
-    where = ["id_cuartel = %s"]
+    where = ["ur.id_cuartel = %s"]
     params: list = [id_cuartel]
     if id_temporada:
-        where.append("id_temporada = %s")
+        where.append("ur.id_temporada = %s")
         params.append(id_temporada)
     sql = f"""
-        SELECT * FROM FACT_AREATECNICA_FERTILIZACION_UNIDADESREQUERIDAS
+        SELECT ur.*, vig.vigor, vig.factor AS vigor_factor
+        FROM FACT_AREATECNICA_FERTILIZACION_UNIDADESREQUERIDAS ur
+        LEFT JOIN DIM_AREATECNICA_FERTILIZACION_VIGOR vig ON vig.id = ur.id_vigor
         WHERE {' AND '.join(where)}
-        ORDER BY hora_registro DESC LIMIT 1
+        ORDER BY ur.hora_registro DESC LIMIT 1
     """
     with get_connection() as conn:
         with conn.cursor() as cur:

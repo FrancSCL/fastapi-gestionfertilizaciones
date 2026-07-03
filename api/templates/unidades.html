@@ -63,9 +63,10 @@
           <select class="filter-select" id="id_vigor" name="id_vigor" required>
             <option value="">— Seleccionar —</option>
             {% for v in vigores %}
-            <option value="{{ v.id }}">{{ v.vigor }} (× {{ v.factor }})</option>
+            <option value="{{ v.id }}" {% if ur_actual and ur_actual.id_vigor == v.id %}selected{% endif %}>{{ v.vigor }} (× {{ v.factor }})</option>
             {% endfor %}
           </select>
+          {% if ur_actual %}<p class="form-hint form-hint-muted">Vigor previamente utilizado: <strong>{{ ur_actual.vigor if ur_actual.vigor is defined else '' }}</strong></p>{% endif %}
         </div>
       </div>
 

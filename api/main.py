@@ -491,6 +491,10 @@ def web_unidades(request: Request, id_cuartel: int, temporada: int | None = None
     temporadas = get_temporadas()
     estimaciones = get_estimaciones_cuartel(id_cuartel)
 
+    # UR guardada actual (para pre-seleccionar vigor)
+    id_temp_actual = temporada or (temporadas[0]["id"] if temporadas else None)
+    ur_actual = get_ur_cuartel(id_cuartel, id_temp_actual) if id_temp_actual else None
+
     return templates.TemplateResponse(
         "unidades.html",
         {
@@ -501,6 +505,7 @@ def web_unidades(request: Request, id_cuartel: int, temporada: int | None = None
             "vigores": get_vigores(),
             "estimaciones": estimaciones,
             "filtro_temporada": temporada,
+            "ur_actual": ur_actual,
         },
     )
 
