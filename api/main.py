@@ -429,9 +429,11 @@ def web_matriz(
     ur = get_ur_cuartel(id_cuartel, id_temp)
     analisis = get_analisis_agronomico(id_cuartel, id_temp) if id_temp else None
 
-    # Cuarteles navegables para el selector: misma sucursal activa +
-    # temporada seleccionada, solo los que tienen programa cargado.
-    id_suc_nav = cuartel.get("id_sucursal") or _id_sucursal(request, None)
+    # Cuarteles navegables para el selector: prioriza la sucursal seleccionada
+    # en la sesion (para que el listado se actualice cuando el usuario cambia
+    # de sucursal en el topbar). Si no hay ninguna en sesion, cae a la del
+    # cuartel actual.
+    id_suc_nav = _id_sucursal(request, None) or cuartel.get("id_sucursal")
     cuarteles_nav = get_cuarteles_navegables(id_suc_nav, id_temp)
 
     errores = {
