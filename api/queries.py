@@ -170,6 +170,7 @@ def get_cuartel_info(id_cuartel: int) -> dict | None:
             ceco.id,
             ceco.descripcion_ceco   AS nombre,
             ceco.sup_productiva,
+            ceco.id_sucursal,
             suc.sucursal,
             var.variedad,
             port.portainjerto
@@ -416,6 +417,39 @@ def get_estimaciones_cuartel(id_cuartel: int) -> list:
     with get_connection() as conn:
         with conn.cursor() as cur:
             cur.execute(sql, (id_cuartel,))
+            return cur.fetchall()
+
+
+def get_cuarteles_navegables(id_sucursal: int | None, id_temporada: int | None) -> list:
+    """Cuarteles de la sucursal con programa cargado en la temporada dada.
+    Usado por el selector de cuartel en la vista matriz para saltar entre
+    cuarteles sin volver al listado."""
+    where = ["1=1"]
+    params: list = []
+    if id_temporada:
+        where.append("prog.id_temporada = %s")
+        params.append(id_temporada)
+    if id_sucursal:
+        where.append("ceco.id_sucursal = %s")
+        params.append(id_sucursal)
+    else:
+        suc_ph = ",".join(["%s"] * len(SUCURSALES_VISIBLES))
+        where.append(f"ceco.id_sucursal IN ({suc_ph})")
+        params.extend(list(SUCURSALES_VISIBLES))
+    sql = f"""
+        SELECT DISTINCT
+            ceco.id AS id_cuartel,
+            ceco.descripcion_ceco AS cuartel,
+            COALESCE(var.variedad, '') AS variedad
+        FROM FACT_AREATECNICA_FERTILIZACION_PROGRAMA prog
+        JOIN DIM_GENERAL_CECO ceco ON ceco.id = prog.id_cuartel
+        LEFT JOIN DIM_GENERAL_VARIEDAD var ON var.id = ceco.id_variedad
+        WHERE {' AND '.join(where)}
+        ORDER BY var.variedad, ceco.descripcion_ceco
+    """
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(sql, params)
             return cur.fetchall()
 
 

@@ -15,7 +15,7 @@ from .queries import (
     listar_cuarteles_con_programas, agrupar_por_sucursal,
     get_cuartel_info, get_semanas_cuartel, get_productos_asignados, build_matriz,
     get_vigores, get_factores_all, get_estimaciones_cuartel,
-    get_ur_cuartel, calcular_unidades, save_unidades_requeridas,
+    get_ur_cuartel, get_cuarteles_navegables, calcular_unidades, save_unidades_requeridas,
     get_analisis_agronomico, save_analisis_agronomico, recalcular_ur_con_ajuste,
     tiene_ajuste_agronomico, get_cuarteles_con_ajuste_temporada,
     listar_cuarteles_con_ajustes,
@@ -429,6 +429,11 @@ def web_matriz(
     ur = get_ur_cuartel(id_cuartel, id_temp)
     analisis = get_analisis_agronomico(id_cuartel, id_temp) if id_temp else None
 
+    # Cuarteles navegables para el selector: misma sucursal activa +
+    # temporada seleccionada, solo los que tienen programa cargado.
+    id_suc_nav = cuartel.get("id_sucursal") or _id_sucursal(request, None)
+    cuarteles_nav = get_cuarteles_navegables(id_suc_nav, id_temp)
+
     errores = {
         "semana_duplicada": "Esa semana ya estaba en el programa. No se duplicó.",
     }
@@ -445,6 +450,7 @@ def web_matriz(
             "analisis": analisis,
             "temporadas": temporadas,
             "filtro_temporada": temporada,
+            "cuarteles_nav": cuarteles_nav,
             "alert_msg": alert_msg,
         },
     )

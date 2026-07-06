@@ -13,6 +13,19 @@
       {% endfor %}
     </select>
   </form>
+  {% if cuarteles_nav and cuarteles_nav | length > 1 %}
+  <select class="filter-select filter-cuartel-nav"
+          style="height:34px;font-size:0.8125rem;max-width:220px;"
+          onchange="if(this.value) window.location.href=this.value;">
+    <option value="">Cambiar cuartel…</option>
+    {% for c in cuarteles_nav %}
+    <option value="/app/matriz/{{ c.id_cuartel }}{% if filtro_temporada %}?temporada={{ filtro_temporada }}{% endif %}"
+            {% if c.id_cuartel == cuartel.id %}selected{% endif %}>
+      {{ c.cuartel }}{% if c.variedad %} · {{ c.variedad }}{% endif %}
+    </option>
+    {% endfor %}
+  </select>
+  {% endif %}
   <button class="filter-btn filter-btn-ghost"
           hx-get="/app/matriz/{{ cuartel.id }}/semanas-disponibles{% if filtro_temporada %}?temporada={{ filtro_temporada }}{% endif %}"
           hx-target="#add-prod-panel"
@@ -143,6 +156,11 @@
       <span class="tag tag-sucursal">{{ cuartel.sucursal }}</span>
       {% if cuartel.variedad %}<span class="tag">{{ cuartel.variedad }}</span>{% endif %}
       {% if cuartel.portainjerto %}<span class="tag">{{ cuartel.portainjerto }}</span>{% endif %}
+      {% if ur and ur.vigor %}
+      <span class="tag tag-vigor" title="Vigor asignado a la UR de este cuartel (factor {{ ur.vigor_factor }})">
+        Vigor: {{ ur.vigor }}
+      </span>
+      {% endif %}
       <span class="cuartel-sup">
         <span class="sup-value">{{ '%.2f' | format(cuartel.sup_productiva | float) }}</span><span class="sup-unit">ha</span>
       </span>
