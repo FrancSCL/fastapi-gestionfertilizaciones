@@ -445,7 +445,7 @@ def get_cuarteles_navegables(id_sucursal: int | None, id_temporada: int | None) 
         JOIN DIM_GENERAL_CECO ceco ON ceco.id = prog.id_cuartel
         LEFT JOIN DIM_GENERAL_VARIEDAD var ON var.id = ceco.id_variedad
         WHERE {' AND '.join(where)}
-        ORDER BY var.variedad, ceco.descripcion_ceco
+        ORDER BY variedad, cuartel
     """
     with get_connection() as conn:
         with conn.cursor() as cur:
