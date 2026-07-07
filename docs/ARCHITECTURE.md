@@ -357,7 +357,7 @@ Las bases operan en paralelo pero con volúmenes distintos. Cualquier cambio est
 Revisar logs en Cloud Run → buscar la traza completa. Causas frecuentes:
 
 - `Can't connect to MySQL server on 'localhost'` → falta `INSTANCE_CONNECTION_NAME` o la vinculación Cloud SQL no está hecha en Cloud Run.
-- `Access denied for user 'UserApp'@'cloudsqlproxy~...'` → la variable `MYSQL_PASSWORD` está mal copiada. Revisar caracteres especiales al final.
+- `Access denied for user 'fsoto'@'cloudsqlproxy~...'` → la variable `MYSQL_PASSWORD` está mal copiada. Revisar caracteres especiales al final.
 - `Unknown column 'X' in 'field list'` → la query referencia una columna que no existe en la base actual. Validar con `SHOW COLUMNS FROM ...`.
 - `Unknown database 'lahornilla_LH_Operaciones'` → el `MYSQL_DB` apunta a un nombre que existe en el datacenter pero no en Cloud SQL (esta última usa `lahornilla_operaciones`, minúsculas y sin prefijo).
 
