@@ -16,6 +16,7 @@ from .queries import (
     get_cuartel_info, get_semanas_cuartel, get_productos_asignados, build_matriz,
     get_vigores, get_factores_all, get_estimaciones_cuartel,
     get_ur_cuartel, get_cuarteles_navegables, calcular_unidades, save_unidades_requeridas,
+    get_resumen_costos, get_comparativa_variedad,
     get_analisis_agronomico, save_analisis_agronomico, recalcular_ur_con_ajuste,
     tiene_ajuste_agronomico, get_cuarteles_con_ajuste_temporada,
     listar_cuarteles_con_ajustes,
@@ -48,7 +49,7 @@ templates = Jinja2Templates(directory=BASE_DIR / "templates")
 
 # ══ AUTH MIDDLEWARE ═══════════════════════════════════════════════════════════
 
-PUBLIC_PATHS = {"/login", "/logout", "/health", "/", "/docs", "/openapi.json", "/redoc"}
+PUBLIC_PATHS = {"/login", "/logout", "/health", "/", "/docs", "/openapi.json", "/redoc", "/dev-login"}
 PUBLIC_PREFIXES = ("/static", "/papeleta", "/registro-semanal", "/login/")
 
 
@@ -243,6 +244,18 @@ async def auth_google_callback(request: Request):
 def do_logout(request: Request):
     request.session.clear()
     return RedirectResponse(url="/login", status_code=303)
+
+
+@app.get("/dev-login")
+def dev_login(request: Request, email: str = "fsoto@lahornilla.cl", next: str = "/app/programas"):
+    """Bypass de OAuth solo para desarrollo local. Requiere DEV_MODE=1 en el
+    entorno. En produccion siempre devuelve 404."""
+    if os.getenv("DEV_MODE") != "1":
+        raise HTTPException(status_code=404, detail="Not found")
+    user = get_usuario_por_email(email.lower())
+    if not user:
+        raise HTTPException(status_code=404, detail=f"Usuario {email} no existe")
+    return _login_session_for(request, user, next)
 
 
 
@@ -943,6 +956,356 @@ def resumen_semanal_excel(
         buf,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         headers={"Content-Disposition": f'attachment; filename="{fn}"'},
+    )
+
+
+# ── Resumen de Costos ─────────────────────────────────────────────────────────
+
+def _sucursales_permitidas_tuple(request: Request) -> tuple | None:
+    """None => admin/super_admin (todas); tuple => solo esas."""
+    perm = request.session.get("user_sucursales")
+    if perm is None:
+        return None
+    return tuple(perm)
+
+
+@app.get("/app/resumen-costos", response_class=HTMLResponse)
+def web_resumen_costos(
+    request: Request,
+    temporada: str | None = None,
+    sucursal: str | None = None,
+    especie: str | None = None,
+):
+    temporada_id = _to_int(temporada)
+    sucursal_id = _to_int(sucursal)
+    especie_id = _to_int(especie)
+
+    temporadas = get_temporadas()
+    id_temp = temporada_id or (temporadas[0]["id"] if temporadas else None)
+    sucursales_perm = _sucursales_permitidas_tuple(request)
+    id_suc = _id_sucursal(request, sucursal_id)
+
+    rows = get_resumen_costos(
+        id_temporada=id_temp,
+        sucursales_permitidas=sucursales_perm,
+        id_sucursal=id_suc,
+        id_especie=especie_id,
+    )
+
+    # Agrupar: especie -> variedad -> lista de cuarteles + subtotales
+    from collections import defaultdict
+    grupos: dict = {}
+    for r in rows:
+        esp = r["especie"]
+        var = r["variedad"]
+        grupos.setdefault(esp, {"variedades": {}, "sup": 0.0, "costo_ha_avg": 0.0, "costo_total": 0.0, "n": 0})
+        grupos[esp]["variedades"].setdefault(var, {"id_variedad": r["id_variedad"], "cuarteles": [],
+                                                    "sup": 0.0, "costo_total": 0.0, "n": 0})
+        v_bucket = grupos[esp]["variedades"][var]
+        cost_ha = float(r["costo_ha_total"] or 0)
+        sup = float(r["sup_productiva"] or 0)
+        cost_total = cost_ha * sup
+        cuartel_dict = {
+            "id_cuartel": r["id_cuartel"],
+            "cuartel": r["cuartel"],
+            "sucursal": r["sucursal"],
+            "id_variedad": r["id_variedad"],
+            "sup": sup,
+            "costo_ha": cost_ha,
+            "costo_total": cost_total,
+            "n_semanas": r["n_semanas"],
+            "tiene_dosis": (r["n_semanas_con_dosis"] or 0) > 0,
+        }
+        v_bucket["cuarteles"].append(cuartel_dict)
+        v_bucket["sup"] += sup
+        v_bucket["costo_total"] += cost_total
+        v_bucket["n"] += 1
+        grupos[esp]["sup"] += sup
+        grupos[esp]["costo_total"] += cost_total
+        grupos[esp]["n"] += 1
+
+    # Calcular costo/ha promedio ponderado por sup
+    for esp, g in grupos.items():
+        g["costo_ha_avg"] = (g["costo_total"] / g["sup"]) if g["sup"] else 0
+        for var, vg in g["variedades"].items():
+            vg["costo_ha_avg"] = (vg["costo_total"] / vg["sup"]) if vg["sup"] else 0
+
+    # Totales globales
+    tot_sup = sum(g["sup"] for g in grupos.values())
+    tot_cost = sum(g["costo_total"] for g in grupos.values())
+    tot_n = sum(g["n"] for g in grupos.values())
+    tot_costo_ha = (tot_cost / tot_sup) if tot_sup else 0
+
+    # Catalogos filtros
+    especies_all = get_especies(id_sucursal=id_suc)
+    sucursales_all = get_sucursales()
+    if sucursales_perm is not None:
+        sucursales_all = [s for s in sucursales_all if s["id"] in sucursales_perm]
+
+    return templates.TemplateResponse(
+        "resumen_costos.html",
+        {
+            "request": request,
+            "active_page": "resumen-costos",
+            "temporadas": temporadas,
+            "especies": especies_all,
+            "sucursales": sucursales_all,
+            "grupos": grupos,
+            "filtro_temporada": id_temp,
+            "filtro_sucursal": id_suc,
+            "filtro_especie": especie_id,
+            "tot_sup": tot_sup,
+            "tot_cost": tot_cost,
+            "tot_costo_ha": tot_costo_ha,
+            "tot_n": tot_n,
+        },
+    )
+
+
+@app.get("/app/resumen-costos/excel")
+def resumen_costos_excel(
+    request: Request,
+    temporada: str | None = None,
+    sucursal: str | None = None,
+    especie: str | None = None,
+):
+    """Exporta el resumen de costos a Excel respetando los filtros aplicados."""
+    from io import BytesIO
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+    from openpyxl.utils import get_column_letter
+    from datetime import datetime as _dt
+
+    temporada_id = _to_int(temporada)
+    sucursal_id = _to_int(sucursal)
+    especie_id = _to_int(especie)
+
+    temporadas = get_temporadas()
+    id_temp = temporada_id or (temporadas[0]["id"] if temporadas else None)
+    sucursales_perm = _sucursales_permitidas_tuple(request)
+    id_suc = _id_sucursal(request, sucursal_id)
+
+    rows = get_resumen_costos(
+        id_temporada=id_temp,
+        sucursales_permitidas=sucursales_perm,
+        id_sucursal=id_suc,
+        id_especie=especie_id,
+    )
+
+    # Etiquetas de los filtros aplicados
+    temp_label = next((t["temporada"] for t in temporadas if t["id"] == id_temp), "")
+    suc_label = "Todas"
+    if id_suc:
+        suc_row = next((s for s in get_sucursales() if s["id"] == id_suc), None)
+        suc_label = suc_row["sucursal"] if suc_row else str(id_suc)
+    esp_label = "Todas"
+    if especie_id:
+        esp_all = get_especies()
+        esp_row = next((e for e in esp_all if e["id"] == especie_id), None)
+        esp_label = esp_row["especie"] if esp_row else str(especie_id)
+
+    # Estilos
+    HDR_FILL = PatternFill("solid", fgColor="2d5a1f")
+    HDR_FONT = Font(bold=True, color="FFFFFF", size=10)
+    ESP_FILL = PatternFill("solid", fgColor="A8C99A")
+    VAR_FILL = PatternFill("solid", fgColor="D7E8C9")
+    TOTAL_FILL = PatternFill("solid", fgColor="2d5a1f")
+    TOTAL_FONT = Font(bold=True, color="FFFFFF", size=11)
+    ZEBRA = PatternFill("solid", fgColor="F4FAF1")
+    THIN = Side(style="thin", color="C5D9BB")
+    BORDER = Border(left=THIN, right=THIN, top=THIN, bottom=THIN)
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Resumen Costos"
+
+    # Encabezado
+    ws["A1"] = "Resumen de Costos por Cuartel - Fertilizaciones"
+    ws["A1"].font = Font(bold=True, size=13, color="2d5a1f")
+    ws.merge_cells("A1:G1")
+    ws["A2"] = f"Temporada: {temp_label}  |  Sucursal: {suc_label}  |  Especie: {esp_label}  |  Generado: {_dt.now().strftime('%d/%m/%Y %H:%M')}"
+    ws["A2"].font = Font(italic=True, color="666666", size=9)
+    ws.merge_cells("A2:G2")
+
+    # Headers tabla
+    HDR_ROW = 4
+    headers = ["Especie", "Variedad", "Cuartel", "Sucursal", "Sup. ha", "Costo/ha USD", "Total USD"]
+    for i, h in enumerate(headers, 1):
+        cell = ws.cell(row=HDR_ROW, column=i, value=h)
+        cell.fill = HDR_FILL
+        cell.font = HDR_FONT
+        cell.alignment = Alignment(horizontal="center", vertical="center")
+        cell.border = BORDER
+    ws.row_dimensions[HDR_ROW].height = 22
+
+    # Agrupar
+    from collections import defaultdict
+    grupos: dict = {}
+    for r in rows:
+        esp = r["especie"]
+        var = r["variedad"]
+        grupos.setdefault(esp, {"variedades": {}, "sup": 0.0, "costo_total": 0.0, "n": 0})
+        grupos[esp]["variedades"].setdefault(var, {"cuarteles": [], "sup": 0.0, "costo_total": 0.0})
+        cost_ha = float(r["costo_ha_total"] or 0)
+        sup = float(r["sup_productiva"] or 0)
+        cost_total = cost_ha * sup
+        grupos[esp]["variedades"][var]["cuarteles"].append({
+            "cuartel": r["cuartel"], "sucursal": r["sucursal"],
+            "sup": sup, "costo_ha": cost_ha, "costo_total": cost_total,
+        })
+        grupos[esp]["variedades"][var]["sup"] += sup
+        grupos[esp]["variedades"][var]["costo_total"] += cost_total
+        grupos[esp]["sup"] += sup
+        grupos[esp]["costo_total"] += cost_total
+        grupos[esp]["n"] += 1
+
+    row = HDR_ROW + 1
+    tot_sup = 0.0
+    tot_cost = 0.0
+    tot_n = 0
+
+    for esp, esp_grp in grupos.items():
+        zebra = False
+        for var, var_grp in esp_grp["variedades"].items():
+            for c in var_grp["cuarteles"]:
+                vals = [esp, var, c["cuartel"], c["sucursal"],
+                        round(c["sup"], 2),
+                        round(c["costo_ha"], 2) if c["costo_ha"] > 0 else None,
+                        round(c["costo_total"], 2) if c["costo_total"] > 0 else None]
+                for i, v in enumerate(vals, 1):
+                    cell = ws.cell(row=row, column=i, value=v)
+                    cell.border = BORDER
+                    if i >= 5:
+                        cell.alignment = Alignment(horizontal="right")
+                    if zebra:
+                        cell.fill = ZEBRA
+                for col in (6, 7):
+                    ws.cell(row=row, column=col).number_format = '"$"#,##0.00'
+                ws.cell(row=row, column=5).number_format = "0.00"
+                row += 1
+                zebra = not zebra
+
+            # Subtotal por variedad
+            var_costo_ha_avg = (var_grp["costo_total"] / var_grp["sup"]) if var_grp["sup"] else 0
+            vals = ["", f"TOTAL {var}", "", "",
+                    round(var_grp["sup"], 2),
+                    round(var_costo_ha_avg, 2),
+                    round(var_grp["costo_total"], 2)]
+            for i, v in enumerate(vals, 1):
+                cell = ws.cell(row=row, column=i, value=v)
+                cell.fill = VAR_FILL
+                cell.font = Font(bold=True)
+                cell.border = BORDER
+                if i >= 5:
+                    cell.alignment = Alignment(horizontal="right")
+            ws.cell(row=row, column=5).number_format = "0.00"
+            for col in (6, 7):
+                ws.cell(row=row, column=col).number_format = '"$"#,##0.00'
+            row += 1
+
+        # Subtotal por especie
+        esp_costo_ha_avg = (esp_grp["costo_total"] / esp_grp["sup"]) if esp_grp["sup"] else 0
+        vals = [f"TOTAL {esp}", "", "", "",
+                round(esp_grp["sup"], 2),
+                round(esp_costo_ha_avg, 2),
+                round(esp_grp["costo_total"], 2)]
+        for i, v in enumerate(vals, 1):
+            cell = ws.cell(row=row, column=i, value=v)
+            cell.fill = ESP_FILL
+            cell.font = Font(bold=True, size=11)
+            cell.border = BORDER
+            if i >= 5:
+                cell.alignment = Alignment(horizontal="right")
+        ws.cell(row=row, column=5).number_format = "0.00"
+        for col in (6, 7):
+            ws.cell(row=row, column=col).number_format = '"$"#,##0.00'
+        row += 2  # espacio entre especies
+
+        tot_sup += esp_grp["sup"]
+        tot_cost += esp_grp["costo_total"]
+        tot_n += esp_grp["n"]
+
+    # Total global
+    tot_costo_ha = (tot_cost / tot_sup) if tot_sup else 0
+    vals = ["TOTAL GENERAL", f"{tot_n} cuarteles", "", "",
+            round(tot_sup, 2), round(tot_costo_ha, 2), round(tot_cost, 2)]
+    for i, v in enumerate(vals, 1):
+        cell = ws.cell(row=row, column=i, value=v)
+        cell.fill = TOTAL_FILL
+        cell.font = TOTAL_FONT
+        cell.border = BORDER
+        if i >= 5:
+            cell.alignment = Alignment(horizontal="right")
+    ws.cell(row=row, column=5).number_format = "0.00"
+    for col in (6, 7):
+        ws.cell(row=row, column=col).number_format = '"$"#,##0.00'
+
+    # Anchos + freeze
+    widths = [18, 18, 32, 20, 10, 13, 15]
+    for i, w in enumerate(widths, 1):
+        ws.column_dimensions[get_column_letter(i)].width = w
+    ws.freeze_panes = ws.cell(row=HDR_ROW + 1, column=1).coordinate
+
+    # Filename
+    parts = ["ResumenCostos"]
+    if suc_label != "Todas":
+        parts.append("".join(ch if ch.isalnum() else "_" for ch in suc_label)[:20])
+    if esp_label != "Todas":
+        parts.append("".join(ch if ch.isalnum() else "_" for ch in esp_label)[:20])
+    if temp_label:
+        parts.append("".join(ch if ch.isalnum() else "_" for ch in temp_label))
+    fn = "_".join(parts) + ".xlsx"
+
+    buf = BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    from fastapi.responses import StreamingResponse
+    return StreamingResponse(
+        buf,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="{fn}"'},
+    )
+
+
+@app.get("/app/resumen-costos/comparar/{id_cuartel}", response_class=HTMLResponse)
+def resumen_costos_comparar(
+    request: Request,
+    id_cuartel: int,
+    id_variedad: int,
+    temporada: str | None = None,
+):
+    """Fragmento HTMX: compara este cuartel contra los otros de misma variedad
+    accesibles al usuario. Solo devuelve HTML del panel."""
+    _require_cuartel_permitido(request, id_cuartel)
+    id_temp = _to_int(temporada)
+    sucursales_perm = _sucursales_permitidas_tuple(request)
+    filas = get_comparativa_variedad(
+        id_variedad=id_variedad,
+        id_temporada=id_temp,
+        sucursales_permitidas=sucursales_perm,
+    )
+    # Enriquecer con costo total y flag "actual"
+    filas_e = []
+    for f in filas:
+        sup = float(f["sup_productiva"] or 0)
+        cost_ha = float(f["costo_ha_total"] or 0)
+        filas_e.append({
+            "id_cuartel": f["id_cuartel"],
+            "cuartel": f["cuartel"],
+            "sucursal": f["sucursal"],
+            "sup": sup,
+            "costo_ha": cost_ha,
+            "costo_total": cost_ha * sup,
+            "es_actual": f["id_cuartel"] == id_cuartel,
+        })
+    return templates.TemplateResponse(
+        "fragment_comparativa_variedad.html",
+        {
+            "request": request,
+            "filas": filas_e,
+            "id_cuartel_actual": id_cuartel,
+            "filtro_temporada": id_temp,
+        },
     )
 
 

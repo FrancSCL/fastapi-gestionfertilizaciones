@@ -1,0 +1,96 @@
+{% set con_costo = filas | selectattr('costo_ha', 'gt', 0) | list %}
+{% set sin_costo = filas | rejectattr('costo_ha', 'gt', 0) | list %}
+{% if con_costo %}
+  {% set min_c = (con_costo | map(attribute='costo_ha') | min) %}
+  {% set max_c = (con_costo | map(attribute='costo_ha') | max) %}
+{% else %}
+  {% set min_c = 0 %}
+  {% set max_c = 0 %}
+{% endif %}
+
+<div class="rc-comp-inner">
+  <div class="rc-comp-title">
+    Cuarteles de la misma variedad
+    <span class="rc-comp-count">
+      {{ filas | length }} cuartel{% if filas | length != 1 %}es{% endif %} según tus permisos
+      {% if sin_costo %}· <strong>{{ con_costo | length }}</strong> con programa cargado{% endif %}
+    </span>
+  </div>
+
+  {% if not con_costo %}
+  <p class="rc-comp-warn">
+    Ninguno de los cuarteles de esta variedad tiene programa cargado en la temporada. No hay costos para comparar.
+  </p>
+  {% endif %}
+
+  {% if con_costo %}
+  <table class="rc-comp-table">
+    <thead>
+      <tr>
+        <th>Cuartel</th>
+        <th>Sucursal</th>
+        <th class="num">Sup. ha</th>
+        <th class="num">Costo/ha USD</th>
+        <th class="num">Total USD</th>
+        <th class="num">Δ vs mín.</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for f in con_costo | sort(attribute='costo_ha') %}
+      <tr class="{% if f.es_actual %}is-actual{% endif %}">
+        <td>
+          {% if f.es_actual %}<span class="rc-comp-dot" title="Cuartel actual"></span>{% endif %}
+          <a href="/app/matriz/{{ f.id_cuartel }}{% if filtro_temporada %}?temporada={{ filtro_temporada }}{% endif %}"
+             class="rc-cuartel-link">{{ f.cuartel }}</a>
+        </td>
+        <td><span class="tag tag-sucursal">{{ f.sucursal }}</span></td>
+        <td class="num">{{ '%.2f' | format(f.sup) }}</td>
+        <td class="num rc-usd-cell {% if f.costo_ha == min_c and min_c != max_c %}is-min{% elif f.costo_ha == max_c and min_c != max_c %}is-max{% endif %}">
+          ${{ '%.2f' | format(f.costo_ha) }}
+        </td>
+        <td class="num rc-usd-cell">${{ '%.2f' | format(f.costo_total) }}</td>
+        <td class="num">
+          {% set diff = f.costo_ha - min_c %}
+          {% if diff == 0 %}
+            <span class="rc-diff-ok">baseline</span>
+          {% else %}
+            <span class="rc-diff-up">+${{ '%.2f' | format(diff) }} <span class="rc-diff-pct">({{ '%.0f' | format(100 * diff / min_c) }}%)</span></span>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <p class="rc-comp-hint">
+    Baseline = cuartel con menor costo/ha del grupo. Δ = diferencia respecto de ese mínimo.
+  </p>
+  {% endif %}
+
+  {% if sin_costo %}
+  <details class="rc-comp-sin-prog">
+    <summary>{{ sin_costo | length }} cuartel{% if sin_costo | length != 1 %}es{% endif %} sin programa cargado</summary>
+    <table class="rc-comp-table rc-comp-table-muted">
+      <thead>
+        <tr>
+          <th>Cuartel</th>
+          <th>Sucursal</th>
+          <th class="num">Sup. ha</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for f in sin_costo %}
+        <tr class="{% if f.es_actual %}is-actual{% endif %}">
+          <td>
+            {% if f.es_actual %}<span class="rc-comp-dot" title="Cuartel actual"></span>{% endif %}
+            <a href="/app/matriz/{{ f.id_cuartel }}{% if filtro_temporada %}?temporada={{ filtro_temporada }}{% endif %}"
+               class="rc-cuartel-link">{{ f.cuartel }}</a>
+          </td>
+          <td><span class="tag tag-sucursal">{{ f.sucursal }}</span></td>
+          <td class="num">{{ '%.2f' | format(f.sup) }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </details>
+  {% endif %}
+</div>

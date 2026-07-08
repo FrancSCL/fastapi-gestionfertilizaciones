@@ -3772,3 +3772,285 @@ h4 { font-size: 0.875rem; text-transform: uppercase; letter-spacing: 0.04em; col
   color: var(--text-muted);
   margin-left: 2px;
 }
+
+/* ── Resumen de Costos ───────────────────────────────────────────────────── */
+.rc-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--sp-2);
+  row-gap: var(--sp-3);
+  padding: var(--sp-3) var(--sp-4);
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  margin-bottom: var(--sp-4);
+}
+.rc-summary strong { color: var(--text-primary); font-weight: 600; }
+.rc-summary .rc-sep { color: var(--n-300); user-select: none; }
+.rc-usd { color: var(--lh-700); font-weight: 600; }
+
+.rc-especie-group {
+  margin-bottom: var(--sp-5);
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.rc-especie-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  padding: var(--sp-3) var(--sp-4);
+  background: var(--lh-800);
+  color: white;
+}
+.rc-especie-title { display: flex; flex-direction: column; gap: 2px; }
+.rc-especie-name {
+  font-family: 'Anybody', system-ui, sans-serif;
+  font-weight: 700;
+  font-size: 1.05rem;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+.rc-especie-count {
+  font-size: 0.75rem;
+  color: var(--lh-200);
+  font-weight: 500;
+}
+.rc-especie-nums {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 0.8125rem;
+  color: var(--lh-100);
+}
+.rc-especie-nums .rc-num-label { color: var(--lh-300); }
+.rc-especie-nums .rc-num-val { color: white; font-weight: 600; }
+.rc-especie-nums .rc-usd { color: #FFE8A3; }
+.rc-especie-nums .rc-sep-inline { color: var(--lh-400); user-select: none; }
+
+.rc-variedad-block {
+  padding: var(--sp-3) var(--sp-4) var(--sp-4);
+  border-top: 1px solid var(--border-subtle);
+}
+.rc-variedad-block:first-of-type { border-top: none; }
+
+.rc-variedad-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--sp-2);
+  margin-bottom: var(--sp-2);
+}
+.rc-variedad-meta {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+.rc-variedad-meta strong { color: var(--text-primary); font-weight: 600; }
+
+.rc-cuarteles-wrap { overflow-x: auto; }
+.rc-cuarteles-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8125rem;
+}
+.rc-cuarteles-table thead th {
+  background: var(--n-100);
+  text-align: left;
+  font-weight: 600;
+  font-size: 0.6875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-secondary);
+  padding: var(--sp-2) var(--sp-3);
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+.rc-cuarteles-table thead th.num,
+.rc-cuarteles-table tbody td.num { text-align: right; font-variant-numeric: tabular-nums; }
+.rc-cuarteles-table tbody td {
+  padding: var(--sp-2) var(--sp-3);
+  border-bottom: 1px solid var(--border-subtle);
+  vertical-align: middle;
+}
+.rc-cuarteles-table tbody tr:last-child > td { border-bottom: none; }
+.rc-cuarteles-table tbody tr:hover:not(.rc-comp-row) { background: var(--lh-50); }
+
+.rc-cuartel-name { font-weight: 600; color: var(--lh-800); }
+.rc-cuartel-link { color: inherit; text-decoration: none; border-bottom: 1px dashed transparent; }
+.rc-cuartel-link:hover { border-bottom-color: var(--lh-500); }
+.rc-usd-cell { font-weight: 600; color: var(--lh-700); }
+.rc-dash { color: var(--n-300); }
+.rc-dosis-mark { color: var(--lh-500); font-weight: 700; }
+.rc-actions { text-align: right; }
+
+.rc-btn-comp {
+  background: transparent;
+  border: 1px solid var(--lh-300);
+  color: var(--lh-700);
+  font-family: inherit;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 4px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.rc-btn-comp:hover { background: var(--lh-50); border-color: var(--lh-500); }
+.rc-btn-comp.is-active { background: var(--lh-700); color: white; border-color: var(--lh-800); }
+
+.rc-comp-row > td.rc-comp-cell {
+  padding: 0;
+  background: var(--n-50);
+  border-bottom: 1px solid var(--border);
+}
+.rc-comp-panel { padding: var(--sp-3) var(--sp-4); }
+.rc-comp-inner {}
+.rc-comp-title {
+  font-family: 'Anybody', system-ui, sans-serif;
+  font-weight: 700;
+  font-size: 0.9375rem;
+  color: var(--lh-800);
+  margin-bottom: var(--sp-2);
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-2);
+}
+.rc-comp-count {
+  font-family: 'Archivo', system-ui, sans-serif;
+  font-weight: 500;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  text-transform: none;
+}
+
+.rc-comp-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8125rem;
+  background: white;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.rc-comp-table thead th {
+  background: var(--n-100);
+  padding: var(--sp-2) var(--sp-3);
+  font-weight: 600;
+  font-size: 0.6875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-secondary);
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+}
+.rc-comp-table thead th.num,
+.rc-comp-table tbody td.num { text-align: right; font-variant-numeric: tabular-nums; }
+.rc-comp-table tbody td {
+  padding: var(--sp-2) var(--sp-3);
+  border-bottom: 1px solid var(--border-subtle);
+}
+.rc-comp-table tbody tr:last-child > td { border-bottom: none; }
+.rc-comp-table tbody tr.is-actual { background: var(--lh-50); }
+.rc-comp-table tbody tr.is-actual > td:first-child { position: relative; padding-left: calc(var(--sp-3) + 6px); }
+.rc-comp-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--lh-600);
+  margin-right: 6px;
+  vertical-align: middle;
+}
+
+.rc-comp-table td.is-min { color: #166534; font-weight: 700; }
+.rc-comp-table td.is-max { color: #b45309; font-weight: 700; }
+
+.rc-diff-ok { color: #166534; font-weight: 600; }
+.rc-diff-up { color: #b45309; font-weight: 600; }
+.rc-diff-pct { color: var(--text-muted); font-weight: 500; font-size: 0.6875rem; }
+
+.rc-comp-hint {
+  margin-top: var(--sp-2);
+  font-size: 0.6875rem;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.rc-btn-excel {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background: var(--lh-600);
+  color: white;
+  font-family: inherit;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  border-radius: 6px;
+  text-decoration: none;
+  border: 1px solid var(--lh-800);
+  transition: background 0.15s, transform 0.1s;
+}
+.rc-btn-excel:hover { background: var(--lh-700); }
+.rc-btn-excel:active { transform: scale(0.98); }
+
+/* HTMX loading state para el botón comparar */
+.rc-btn-comp.htmx-request {
+  cursor: wait;
+  opacity: 0.6;
+  position: relative;
+}
+.rc-btn-comp.htmx-request::after {
+  content: "…";
+  margin-left: 4px;
+  animation: rc-dots 1s steps(3, end) infinite;
+}
+@keyframes rc-dots {
+  0%   { content: ""; }
+  33%  { content: "."; }
+  66%  { content: ".."; }
+  100% { content: "..."; }
+}
+
+.rc-comp-warn {
+  margin: 0;
+  padding: var(--sp-3) var(--sp-4);
+  background: var(--accent-100);
+  border: 1px solid oklch(0.82 0.06 75);
+  border-radius: 6px;
+  color: oklch(0.35 0.08 75);
+  font-size: 0.8125rem;
+  line-height: 1.5;
+}
+
+.rc-comp-sin-prog {
+  margin-top: var(--sp-3);
+  border-top: 1px dashed var(--border);
+  padding-top: var(--sp-3);
+}
+.rc-comp-sin-prog summary {
+  cursor: pointer;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 4px 0;
+  user-select: none;
+}
+.rc-comp-sin-prog summary::-webkit-details-marker { color: var(--text-muted); }
+.rc-comp-sin-prog[open] summary { margin-bottom: var(--sp-2); color: var(--text-primary); }
+.rc-comp-table-muted { opacity: 0.85; }
+.rc-comp-table-muted tbody td { color: var(--text-secondary); }

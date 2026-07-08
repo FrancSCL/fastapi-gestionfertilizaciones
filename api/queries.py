@@ -420,6 +420,117 @@ def get_estimaciones_cuartel(id_cuartel: int) -> list:
             return cur.fetchall()
 
 
+def get_resumen_costos(
+    id_temporada: int | None,
+    sucursales_permitidas: tuple | None,
+    id_sucursal: int | None = None,
+    id_especie: int | None = None,
+) -> list:
+    """Costo total del programa por cuartel (agrupado por especie -> variedad
+    -> cuartel). Solo cuarteles productivos y solo sucursales permitidas al
+    usuario. sucursales_permitidas=None significa admin (todas las visibles).
+    """
+    perm = sucursales_permitidas if sucursales_permitidas is not None else SUCURSALES_VISIBLES
+    if not perm:
+        return []
+    suc_ph = ",".join(["%s"] * len(perm))
+    # Orden de params debe seguir el orden en que aparecen los %s en el SQL:
+    # primero el ON del LEFT JOIN de prog (id_temporada), luego el WHERE.
+    prog_on_temp = ""
+    join_params: list = []
+    if id_temporada:
+        prog_on_temp = "AND prog.id_temporada = %s"
+        join_params.append(id_temporada)
+    where = [f"suc.id IN ({suc_ph})", "ceco.sup_productiva > 0"]
+    where_params: list = list(perm)
+    if id_sucursal:
+        where.append("suc.id = %s")
+        where_params.append(id_sucursal)
+    if id_especie:
+        where.append("esp.id = %s")
+        where_params.append(id_especie)
+    where_sql = "WHERE " + " AND ".join(where)
+    params = join_params + where_params
+
+    sql = f"""
+        SELECT
+            ceco.id AS id_cuartel,
+            ceco.descripcion_ceco AS cuartel,
+            ceco.sup_productiva,
+            var.id AS id_variedad,
+            COALESCE(var.variedad, '(sin variedad)') AS variedad,
+            esp.id AS id_especie,
+            COALESCE(esp.especie, '(sin especie)') AS especie,
+            suc.id AS id_sucursal,
+            suc.sucursal,
+            COALESCE(SUM(pp.cantidad_producto * COALESCE(prod.precio_usd, 0)), 0) AS costo_ha_total,
+            COUNT(DISTINCT prog.id) AS n_semanas,
+            COUNT(DISTINCT CASE WHEN pp.cantidad_producto > 0 THEN prog.id END) AS n_semanas_con_dosis
+        FROM DIM_GENERAL_CECO ceco
+        JOIN DIM_GENERAL_SUCURSAL suc ON suc.id = ceco.id_sucursal
+        LEFT JOIN DIM_GENERAL_VARIEDAD var ON var.id = ceco.id_variedad
+        LEFT JOIN DIM_GENERAL_ESPECIE  esp ON esp.id = var.id_especie
+        LEFT JOIN FACT_AREATECNICA_FERTILIZACION_PROGRAMA prog
+                  ON prog.id_cuartel = ceco.id {prog_on_temp}
+        LEFT JOIN FACT_AREATECNICA_FERTILIZACION_PRODUCTOSPROGRAMA pp
+                  ON pp.id_fertilizacion = prog.id
+        LEFT JOIN DIM_AREATECNICA_FITO_PRODUCTO prod ON prod.id = pp.id_producto
+        {where_sql}
+        GROUP BY ceco.id, ceco.descripcion_ceco, ceco.sup_productiva,
+                 var.id, var.variedad, esp.id, esp.especie, suc.id, suc.sucursal
+        ORDER BY especie, variedad, suc.sucursal, ceco.descripcion_ceco
+    """
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(sql, params)
+            return cur.fetchall()
+
+
+def get_comparativa_variedad(
+    id_variedad: int,
+    id_temporada: int | None,
+    sucursales_permitidas: tuple | None,
+) -> list:
+    """Cuarteles de la misma variedad accesibles al usuario, con su costo/ha
+    del programa. Usado por el fragmento HTMX de comparacion."""
+    perm = sucursales_permitidas if sucursales_permitidas is not None else SUCURSALES_VISIBLES
+    if not perm:
+        return []
+    suc_ph = ",".join(["%s"] * len(perm))
+    prog_on_temp = ""
+    join_params: list = []
+    if id_temporada:
+        prog_on_temp = "AND prog.id_temporada = %s"
+        join_params.append(id_temporada)
+    where = [f"suc.id IN ({suc_ph})", "ceco.sup_productiva > 0", "ceco.id_variedad = %s"]
+    where_params: list = list(perm) + [id_variedad]
+    params = join_params + where_params
+    where_sql = "WHERE " + " AND ".join(where)
+
+    sql = f"""
+        SELECT
+            ceco.id AS id_cuartel,
+            ceco.descripcion_ceco AS cuartel,
+            ceco.sup_productiva,
+            suc.sucursal,
+            COALESCE(SUM(pp.cantidad_producto * COALESCE(prod.precio_usd, 0)), 0) AS costo_ha_total
+        FROM DIM_GENERAL_CECO ceco
+        JOIN DIM_GENERAL_SUCURSAL suc ON suc.id = ceco.id_sucursal
+        LEFT JOIN FACT_AREATECNICA_FERTILIZACION_PROGRAMA prog
+                  ON prog.id_cuartel = ceco.id {prog_on_temp}
+        LEFT JOIN FACT_AREATECNICA_FERTILIZACION_PRODUCTOSPROGRAMA pp
+                  ON pp.id_fertilizacion = prog.id
+        LEFT JOIN DIM_AREATECNICA_FITO_PRODUCTO prod ON prod.id = pp.id_producto
+        {where_sql}
+        GROUP BY ceco.id, ceco.descripcion_ceco, ceco.sup_productiva, suc.sucursal
+        ORDER BY costo_ha_total DESC
+    """
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(sql, params)
+            return cur.fetchall()
+
+
 def get_cuarteles_navegables(id_sucursal: int | None, id_temporada: int | None) -> list:
     """Cuarteles de la sucursal con programa cargado en la temporada dada.
     Usado por el selector de cuartel en la vista matriz para saltar entre

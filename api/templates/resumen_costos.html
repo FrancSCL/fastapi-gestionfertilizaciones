@@ -1,0 +1,179 @@
+{% extends "base.html" %}
+
+{% block title %}Resumen de Costos{% endblock %}
+{% block topbar_title %}Resumen de Costos{% endblock %}
+
+{% block content %}
+
+<!-- Filtros -->
+<form method="get" action="/app/resumen-costos" class="filters" id="filtersForm">
+  <div class="filter-group">
+    <label class="filter-label" for="temporada">Temporada</label>
+    <select id="temporada" name="temporada" class="filter-select" onchange="this.form.submit()">
+      {% for t in temporadas %}
+      <option value="{{ t.id }}" {% if filtro_temporada == t.id %}selected{% endif %}>{{ t.temporada }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div class="filter-group">
+    <label class="filter-label" for="sucursal">Sucursal</label>
+    <select id="sucursal" name="sucursal" class="filter-select" onchange="this.form.submit()">
+      {% if sucursales | length > 1 %}
+      <option value="">Todas las sucursales</option>
+      {% endif %}
+      {% for s in sucursales %}
+      <option value="{{ s.id }}" {% if filtro_sucursal == s.id %}selected{% endif %}>{{ s.sucursal }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div class="filter-group">
+    <label class="filter-label" for="especie">Especie</label>
+    <select id="especie" name="especie" class="filter-select" onchange="this.form.submit()">
+      <option value="">Todas las especies</option>
+      {% for e in especies %}
+      <option value="{{ e.id }}" {% if filtro_especie == e.id %}selected{% endif %}>{{ e.especie }}</option>
+      {% endfor %}
+    </select>
+  </div>
+</form>
+
+<!-- Meta strip global -->
+<div class="rc-summary">
+  <span><strong>{{ tot_n }}</strong> cuarteles</span>
+  <span class="rc-sep">·</span>
+  <span><strong>{{ '%.1f' | format(tot_sup) }}</strong> ha</span>
+  <span class="rc-sep">·</span>
+  <span>Costo/ha promedio: <strong class="rc-usd">${{ '%.2f' | format(tot_costo_ha) }}</strong></span>
+  <span class="rc-sep">·</span>
+  <span>Costo total: <strong class="rc-usd">${{ '%.2f' | format(tot_cost) }}</strong> USD</span>
+  <a href="/app/resumen-costos/excel?temporada={{ filtro_temporada or '' }}{% if filtro_sucursal %}&sucursal={{ filtro_sucursal }}{% endif %}{% if filtro_especie %}&especie={{ filtro_especie }}{% endif %}"
+     class="rc-btn-excel" title="Descargar Excel respetando los filtros aplicados">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="14" height="14" fill="none"
+         stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+      <polyline points="7 10 12 15 17 10"/>
+      <line x1="12" y1="15" x2="12" y2="3"/>
+    </svg>
+    Descargar Excel
+  </a>
+</div>
+
+{% if not grupos %}
+<div class="empty-state">
+  <svg class="empty-state-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
+       fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12" y2="16"/>
+  </svg>
+  <p class="empty-state-text">No hay cuarteles con programa para los filtros seleccionados.</p>
+</div>
+{% else %}
+
+{% for esp_nombre, esp_grp in grupos.items() %}
+<section class="rc-especie-group">
+  <header class="rc-especie-header">
+    <div class="rc-especie-title">
+      <span class="rc-especie-name">{{ esp_nombre }}</span>
+      <span class="rc-especie-count">{{ esp_grp.n }} cuartel{% if esp_grp.n != 1 %}es{% endif %} · {{ '%.1f' | format(esp_grp.sup) }} ha</span>
+    </div>
+    <div class="rc-especie-nums">
+      <span class="rc-num-label">Costo/ha prom.</span>
+      <span class="rc-num-val rc-usd">${{ '%.2f' | format(esp_grp.costo_ha_avg) }}</span>
+      <span class="rc-sep-inline">·</span>
+      <span class="rc-num-label">Total</span>
+      <span class="rc-num-val rc-usd">${{ '%.2f' | format(esp_grp.costo_total) }}</span>
+    </div>
+  </header>
+
+  {% for var_nombre, var_grp in esp_grp.variedades.items() %}
+  <div class="rc-variedad-block">
+    <div class="rc-variedad-header">
+      <span class="tag">{{ var_nombre }}</span>
+      <span class="rc-variedad-meta">
+        {{ var_grp.n }} cuartel{% if var_grp.n != 1 %}es{% endif %}
+        · {{ '%.1f' | format(var_grp.sup) }} ha
+        · costo/ha prom. <strong class="rc-usd">${{ '%.2f' | format(var_grp.costo_ha_avg) }}</strong>
+        · total <strong class="rc-usd">${{ '%.2f' | format(var_grp.costo_total) }}</strong>
+      </span>
+    </div>
+
+    <div class="rc-cuarteles-wrap">
+      <table class="rc-cuarteles-table">
+        <thead>
+          <tr>
+            <th>Cuartel</th>
+            <th>Sucursal</th>
+            <th class="num">Sup. ha</th>
+            <th class="num">Costo/ha USD</th>
+            <th class="num">Total USD</th>
+            <th class="num">Semanas</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for c in var_grp.cuarteles %}
+          <tr class="rc-row" data-cuartel="{{ c.id_cuartel }}">
+            <td class="rc-cuartel-name">
+              <a href="/app/matriz/{{ c.id_cuartel }}{% if filtro_temporada %}?temporada={{ filtro_temporada }}{% endif %}"
+                 class="rc-cuartel-link">{{ c.cuartel }}</a>
+            </td>
+            <td><span class="tag tag-sucursal">{{ c.sucursal }}</span></td>
+            <td class="num">{{ '%.2f' | format(c.sup) }}</td>
+            <td class="num rc-usd-cell">
+              {% if c.costo_ha > 0 %}${{ '%.2f' | format(c.costo_ha) }}{% else %}<span class="rc-dash" title="Cuartel sin dosis cargadas en el programa">—</span>{% endif %}
+            </td>
+            <td class="num rc-usd-cell">
+              {% if c.costo_total > 0 %}${{ '%.2f' | format(c.costo_total) }}{% else %}<span class="rc-dash" title="Cuartel sin dosis cargadas en el programa">—</span>{% endif %}
+            </td>
+            <td class="num">
+              {% if c.n_semanas %}
+                {{ c.n_semanas }}{% if c.tiene_dosis %} <span class="rc-dosis-mark" title="Con dosis cargadas">·</span>{% endif %}
+              {% else %}<span class="rc-dash">—</span>{% endif %}
+            </td>
+            <td class="rc-actions">
+              {% if var_grp.cuarteles | length > 1 %}
+              <button type="button" class="rc-btn-comp"
+                      hx-get="/app/resumen-costos/comparar/{{ c.id_cuartel }}?id_variedad={{ c.id_variedad }}{% if filtro_temporada %}&temporada={{ filtro_temporada }}{% endif %}"
+                      hx-target="#rc-comp-{{ c.id_cuartel }}"
+                      hx-swap="innerHTML"
+                      onclick="rcToggle(this, {{ c.id_cuartel }})">
+                Comparar
+              </button>
+              {% endif %}
+            </td>
+          </tr>
+          <tr class="rc-comp-row" id="rc-comp-row-{{ c.id_cuartel }}" hidden>
+            <td colspan="7" class="rc-comp-cell">
+              <div id="rc-comp-{{ c.id_cuartel }}" class="rc-comp-panel"></div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% endfor %}
+
+</section>
+{% endfor %}
+
+{% endif %}
+
+<script>
+  function rcToggle(btn, idCuartel) {
+    const row = document.getElementById('rc-comp-row-' + idCuartel);
+    const wasHidden = row.hidden;
+    // Cerrar cualquier otra fila abierta
+    document.querySelectorAll('.rc-comp-row').forEach(r => {
+      if (r !== row) {
+        r.hidden = true;
+        const b = document.querySelector(`.rc-btn-comp[hx-target="#${r.querySelector('.rc-comp-panel').id}"]`);
+        if (b) b.classList.remove('is-active');
+      }
+    });
+    row.hidden = !wasHidden;
+    btn.classList.toggle('is-active', !wasHidden);
+    btn.textContent = wasHidden ? 'Cerrar' : 'Comparar';
+  }
+</script>
+
+{% endblock %}
