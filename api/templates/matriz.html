@@ -266,8 +266,8 @@
             <td class="matriz-cell {% if val is none %}matriz-cell-empty{% endif %}">
               {% if val is not none %}
               <input class="celda-input"
-                     type="number" min="0" step="1"
-                     value="{{ val | int }}"
+                     type="number" min="0" step="0.1"
+                     value="{{ '%g' | format(val | float) }}"
                      hx-post="/app/matriz/{{ cuartel.id }}/dosis"
                      hx-trigger="change"
                      hx-swap="none"
