@@ -570,8 +570,15 @@ def get_ur_cuartel(id_cuartel: int, id_temporada: int | None = None) -> dict | N
     if id_temporada:
         where.append("ur.id_temporada = %s")
         params.append(id_temporada)
+    # ton_estimadas: la estimacion mas reciente disponible al momento del
+    # calculo de la UR (esa es la que se uso segun el flujo del backend).
     sql = f"""
-        SELECT ur.*, vig.vigor, vig.factor AS vigor_factor
+        SELECT ur.*, vig.vigor, vig.factor AS vigor_factor,
+               (SELECT v.ton_estimadas
+                FROM VISTA_FERTILIZACIONES_ESTIMACION_BASE v
+                WHERE v.id_cuartel = ur.id_cuartel
+                  AND v.hora_registro <= ur.hora_registro
+                ORDER BY v.hora_registro DESC LIMIT 1) AS ton_estimadas
         FROM FACT_AREATECNICA_FERTILIZACION_UNIDADESREQUERIDAS ur
         LEFT JOIN DIM_AREATECNICA_FERTILIZACION_VIGOR vig ON vig.id = ur.id_vigor
         WHERE {' AND '.join(where)}

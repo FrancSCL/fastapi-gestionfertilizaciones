@@ -161,6 +161,11 @@
         Vigor: {{ ur.vigor }}
       </span>
       {% endif %}
+      {% if ur and ur.ton_estimadas %}
+      <span class="tag tag-ton" title="Toneladas de fruta estimadas usadas para el calculo de la UR">
+        {{ '%.1f' | format(ur.ton_estimadas | float) }} ton
+      </span>
+      {% endif %}
       <span class="cuartel-sup">
         <span class="sup-value">{{ '%.2f' | format(cuartel.sup_productiva | float) }}</span><span class="sup-unit">ha</span>
       </span>

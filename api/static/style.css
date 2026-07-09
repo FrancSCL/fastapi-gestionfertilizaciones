@@ -675,6 +675,15 @@ h4 { font-size: 0.875rem; text-transform: uppercase; letter-spacing: 0.04em; col
   font-size: 0.6875rem;
 }
 
+.tag-ton {
+  background: var(--accent-100);
+  color: oklch(0.42 0.11 75);
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 0.6875rem;
+  font-weight: 600;
+}
+
 /* Sup badge */
 .sup-value {
   font-variant-numeric: tabular-nums;
