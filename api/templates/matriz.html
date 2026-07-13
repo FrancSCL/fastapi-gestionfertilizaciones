@@ -60,37 +60,53 @@
   <aside class="prod-panel">
     <div class="prod-panel-header">Resumen por producto</div>
 
-    {% if ur %}
     <div class="prod-panel-meta">
       <span class="prod-panel-meta-title">Balance (un/ha)</span>
+      {% if not ur %}
+      <div class="prod-panel-meta-warn" title="Este cuartel aun no tiene UR calculada. Se muestra solo lo programado.">
+        SIN UR — se muestra solo lo programado
+      </div>
+      {% endif %}
       <table class="prod-balance-table">
         <thead>
           <tr>
             <th>Nut</th>
-            <th>Req</th>
+            {% if ur %}<th>Req</th>{% endif %}
             <th>Prog</th>
-            <th>Saldo</th>
+            {% if ur %}<th>Saldo</th>{% endif %}
           </tr>
         </thead>
         <tbody>
-          {% set metas = [('N',ur.unidades_N),('K',ur.unidades_K),('P',ur.unidades_P),('Mg',ur.unidades_Mg),('B',ur.unidades_B),('Ca',ur.unidades_Ca),('Zn',ur.unidades_Zn),('Mn',ur.unidades_Mn)] %}
-          {% for label, v in metas if v and (v | float) > 0 %}
-          {% set req = v | float %}
-          {% set prog = (matriz.totales_aporte[label] | default(0)) | float %}
-          {% set saldo = req - prog %}
-          <tr data-nut="{{ label }}" data-req="{{ req }}">
-            <th>{{ label }}</th>
-            <td>{{ '%.1f' | format(req) }}</td>
-            <td data-prog-val>{{ '%.1f' | format(prog) }}</td>
-            <td data-saldo-val class="{% if saldo > 0.05 %}is-falta{% elif saldo < -0.05 %}is-sobra{% else %}is-ok{% endif %}">
-              {% if saldo < -0.05 %}+{{ '%.1f' | format(-saldo) }}{% else %}{{ '%.1f' | format(saldo) }}{% endif %}
-            </td>
-          </tr>
-          {% endfor %}
+          {% set nutrientes = ['N','K','P','Mg','B','Ca','Zn','Mn'] %}
+          {% if ur %}
+            {% set metas = [('N',ur.unidades_N),('K',ur.unidades_K),('P',ur.unidades_P),('Mg',ur.unidades_Mg),('B',ur.unidades_B),('Ca',ur.unidades_Ca),('Zn',ur.unidades_Zn),('Mn',ur.unidades_Mn)] %}
+            {% for label, v in metas if v and (v | float) > 0 %}
+            {% set req = v | float %}
+            {% set prog = (matriz.totales_aporte[label] | default(0)) | float %}
+            {% set saldo = req - prog %}
+            <tr data-nut="{{ label }}" data-req="{{ req }}">
+              <th>{{ label }}</th>
+              <td>{{ '%.1f' | format(req) }}</td>
+              <td data-prog-val>{{ '%.1f' | format(prog) }}</td>
+              <td data-saldo-val class="{% if saldo > 0.05 %}is-falta{% elif saldo < -0.05 %}is-sobra{% else %}is-ok{% endif %}">
+                {% if saldo < -0.05 %}+{{ '%.1f' | format(-saldo) }}{% else %}{{ '%.1f' | format(saldo) }}{% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          {% else %}
+            {% for label in nutrientes %}
+            {% set prog = (matriz.totales_aporte[label] | default(0)) | float %}
+            {% if prog > 0 %}
+            <tr data-nut="{{ label }}">
+              <th>{{ label }}</th>
+              <td data-prog-val>{{ '%.1f' | format(prog) }}</td>
+            </tr>
+            {% endif %}
+            {% endfor %}
+          {% endif %}
         </tbody>
       </table>
     </div>
-    {% endif %}
 
     {% if matriz.productos %}
     <div class="prod-panel-body">
