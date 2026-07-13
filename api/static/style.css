@@ -4063,3 +4063,17 @@ h4 { font-size: 0.875rem; text-transform: uppercase; letter-spacing: 0.04em; col
 .rc-comp-sin-prog[open] summary { margin-bottom: var(--sp-2); color: var(--text-primary); }
 .rc-comp-table-muted { opacity: 0.85; }
 .rc-comp-table-muted tbody td { color: var(--text-secondary); }
+
+.tag-sin-ur {
+  background: var(--accent-100);
+  color: oklch(0.45 0.13 60);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-size: 0.625rem;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 3px;
+  margin-left: 6px;
+  vertical-align: middle;
+  border: 1px solid oklch(0.78 0.08 60 / 0.4);
+}

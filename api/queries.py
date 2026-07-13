@@ -28,9 +28,11 @@ def listar_cuarteles_con_programas(
     id_sucursal: int | None = None,
     id_especie: int | None = None,
     id_variedad: int | None = None,
-    filtro_ur: str = "con_ur",  # 'con_ur', 'sin_ur', 'todos'
+    filtro_ur: str = "todos",  # 'con_ur', 'sin_ur', 'todos'
 ) -> list:
-    """Lista cuarteles con programas, incluyendo flag de si tienen UR para la temporada."""
+    """Lista cuarteles con programas, incluyendo flag de si tienen UR para la temporada.
+    Por defecto muestra todos (con o sin UR): un cuartel puede tener programa cargado
+    aunque no se le haya calculado la UR todavia — el badge en la UI lo diferencia."""
     ur_cond = "AND ur.id_temporada = %s" if id_temporada else ""
     suc_ph = ",".join(["%s"] * len(SUCURSALES_VISIBLES))
     where = [f"suc.id IN ({suc_ph})"]

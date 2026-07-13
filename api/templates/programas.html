@@ -101,6 +101,11 @@
             </svg>
           </span>
           {% endif %}
+          {% if not p.tiene_ur %}
+          <span class="tag tag-sin-ur" title="Cuartel con programa cargado pero sin Unidades Requeridas calculadas">
+            SIN UR
+          </span>
+          {% endif %}
         </td>
         <td><span class="tag">{{ p.variedad or '—' }}</span></td>
         <td><span class="tag">{{ p.portainjerto or '—' }}</span></td>
