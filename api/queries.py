@@ -35,7 +35,7 @@ def listar_cuarteles_con_programas(
     aunque no se le haya calculado la UR todavia — el badge en la UI lo diferencia."""
     ur_cond = "AND ur.id_temporada = %s" if id_temporada else ""
     suc_ph = ",".join(["%s"] * len(SUCURSALES_VISIBLES))
-    where = [f"suc.id IN ({suc_ph})"]
+    where = [f"suc.id IN ({suc_ph})", "ceco.id_estado = 1"]
     if id_temporada:
         where.append("prog.id_temporada = %s")
     if id_sucursal:
@@ -537,7 +537,7 @@ def get_cuarteles_navegables(id_sucursal: int | None, id_temporada: int | None) 
     """Cuarteles de la sucursal con programa cargado en la temporada dada.
     Usado por el selector de cuartel en la vista matriz para saltar entre
     cuarteles sin volver al listado."""
-    where = ["1=1"]
+    where = ["ceco.id_estado = 1"]
     params: list = []
     if id_temporada:
         where.append("prog.id_temporada = %s")
