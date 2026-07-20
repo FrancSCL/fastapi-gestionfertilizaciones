@@ -959,6 +959,154 @@ def resumen_semanal_excel(
     )
 
 
+@app.get("/app/matriz/{id_cuartel}/programa-productos/excel")
+def programa_productos_excel(
+    request: Request,
+    id_cuartel: int,
+    temporada: int | None = None,
+):
+    """Excel matriz semana x producto (nombre comercial). Cada celda = cantidad
+    total a aplicar esa semana (dosis/ha x sup_productiva). Formato solicitado
+    por encargados de campo para armar retiros/aplicaciones."""
+    _require_cuartel_permitido(request, id_cuartel)
+    cuartel = get_cuartel_info(id_cuartel)
+    if not cuartel:
+        raise HTTPException(404, "Cuartel no encontrado")
+    semanas_rows = get_semanas_cuartel(id_cuartel, temporada)
+    ids_prog = [s["id_programa"] for s in semanas_rows]
+    productos_rows = get_productos_asignados(ids_prog)
+    matriz = build_matriz(semanas_rows, productos_rows)
+
+    sup = float(cuartel.get("sup_productiva") or 0)
+    productos = matriz.get("productos") or []
+
+    from io import BytesIO
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+
+    HDR_FILL = PatternFill("solid", fgColor="2d5a1f")
+    HDR_FONT = Font(bold=True, color="FFFFFF", size=10)
+    ZEBRA = PatternFill("solid", fgColor="F4FAF1")
+    TOTAL_FILL = PatternFill("solid", fgColor="D7E8C9")
+    EMPTY_FILL = PatternFill("solid", fgColor="F5F5F5")
+    THIN = Side(style="thin", color="C5D9BB")
+    BORDER = Border(left=THIN, right=THIN, top=THIN, bottom=THIN)
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Programa por producto"
+
+    # Encabezado
+    ws["A1"] = f"Programa por producto — {cuartel.get('nombre') or cuartel.get('descripcion_ceco') or id_cuartel}"
+    ws["A1"].font = Font(bold=True, size=12, color="2d5a1f")
+    ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=max(5, len(productos) + 1))
+    meta_parts = []
+    if cuartel.get("sucursal"): meta_parts.append(str(cuartel["sucursal"]))
+    if cuartel.get("variedad"): meta_parts.append(str(cuartel["variedad"]))
+    if sup > 0: meta_parts.append(f"{sup:.2f} ha")
+    meta_parts.append("Cantidades = dosis/ha x superficie" if sup > 0 else "Cantidades = dosis/ha (sin sup cargada)")
+    ws["A2"] = " · ".join(meta_parts)
+    ws["A2"].font = Font(italic=True, color="666666", size=9)
+    ws.merge_cells(start_row=2, start_column=1, end_row=2, end_column=max(5, len(productos) + 1))
+
+    if not productos:
+        ws["A4"] = "Este cuartel no tiene productos asignados en el programa."
+        ws["A4"].font = Font(italic=True, color="999999")
+        buf = BytesIO()
+        wb.save(buf)
+        buf.seek(0)
+    else:
+        # Headers: Semana + Fecha + productos + Total
+        HEADER_ROW = 4
+        headers = ["Semana", "Fecha"] + [f"{p['nombre']} ({p['unidad'] or 'kg'})" for p in productos] + ["Total"]
+        for col_idx, h in enumerate(headers, start=1):
+            cell = ws.cell(row=HEADER_ROW, column=col_idx, value=h)
+            cell.fill = HDR_FILL
+            cell.font = HDR_FONT
+            cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+            cell.border = BORDER
+
+        # Multiplicador: si sup=0, cantidades = dosis/ha; si sup>0, cantidades = dosis/ha * sup
+        mult = sup if sup > 0 else 1.0
+
+        # Filas: una por semana
+        totales_por_producto = [0.0] * len(productos)
+        row = HEADER_ROW + 1
+        for fila in matriz["filas"]:
+            sem = fila["semana"]
+            fecha = ""
+            if sem.get("fecha_inicio") and sem.get("fecha_fin"):
+                fi = sem["fecha_inicio"]
+                ff = sem["fecha_fin"]
+                fecha = f"{fi.strftime('%d/%m')} - {ff.strftime('%d/%m')}"
+            vals = [sem.get("etiqueta") or "", fecha]
+            total_sem = 0.0
+            vacia = True
+            for i, prod in enumerate(productos):
+                dosis = fila["celdas"][i]
+                if dosis and dosis > 0:
+                    cant = dosis * mult
+                    vals.append(round(cant, 2))
+                    totales_por_producto[i] += cant
+                    total_sem += cant
+                    vacia = False
+                else:
+                    vals.append(None)
+            vals.append(round(total_sem, 2) if total_sem > 0 else None)
+            for col_idx, v in enumerate(vals, start=1):
+                cell = ws.cell(row=row, column=col_idx, value=v)
+                cell.border = BORDER
+                if col_idx >= 3:
+                    cell.alignment = Alignment(horizontal="right")
+                if vacia:
+                    cell.fill = EMPTY_FILL
+                elif row % 2 == 0:
+                    cell.fill = ZEBRA
+            row += 1
+
+        # Fila total
+        total_row = row
+        etiqueta_total = "Total superficie" if sup > 0 else "Total dosis/ha"
+        total_vals = [etiqueta_total, ""]
+        gran_total = 0.0
+        for t in totales_por_producto:
+            total_vals.append(round(t, 2) if t > 0 else None)
+            gran_total += t
+        total_vals.append(round(gran_total, 2) if gran_total > 0 else None)
+        for col_idx, v in enumerate(total_vals, start=1):
+            cell = ws.cell(row=total_row, column=col_idx, value=v)
+            cell.fill = TOTAL_FILL
+            cell.font = Font(bold=True)
+            cell.border = BORDER
+            if col_idx >= 3:
+                cell.alignment = Alignment(horizontal="right")
+
+        # Anchos
+        ws.column_dimensions["A"].width = 14
+        ws.column_dimensions["B"].width = 14
+        for i in range(len(productos)):
+            col_letter = ws.cell(row=HEADER_ROW, column=3 + i).column_letter
+            ws.column_dimensions[col_letter].width = 16
+        total_col_letter = ws.cell(row=HEADER_ROW, column=3 + len(productos)).column_letter
+        ws.column_dimensions[total_col_letter].width = 12
+        ws.row_dimensions[HEADER_ROW].height = 32
+        ws.freeze_panes = ws.cell(row=HEADER_ROW + 1, column=3).coordinate
+
+        buf = BytesIO()
+        wb.save(buf)
+        buf.seek(0)
+
+    nombre_cuartel = (cuartel.get("nombre") or cuartel.get("descripcion_ceco") or f"cuartel_{id_cuartel}")
+    safe = "".join(c if c.isalnum() else "_" for c in str(nombre_cuartel))[:40]
+    fn = f"programa_productos_{safe}.xlsx"
+    from fastapi.responses import StreamingResponse
+    return StreamingResponse(
+        buf,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="{fn}"'},
+    )
+
+
 # ── Resumen de Costos ─────────────────────────────────────────────────────────
 
 def _sucursales_permitidas_tuple(request: Request) -> tuple | None:
