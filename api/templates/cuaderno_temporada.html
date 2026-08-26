@@ -49,17 +49,11 @@
       <option value="{{ t.id }}" {% if filtro_temporada == t.id %}selected{% endif %}>{{ t.temporada }}</option>
       {% endfor %}
     </select>
-    <select name="sucursal" onchange="this.form.submit()">
-      <option value="">Todas las sucursales</option>
-      {% for s in sucursales %}
-      <option value="{{ s.id }}" {% if filtro_sucursal == s.id %}selected{% endif %}>{{ s.sucursal }}</option>
-      {% endfor %}
-    </select>
     <div class="ct-actions">
-      <a class="ct-btn" href="/app/cuaderno-temporada/excel?temporada={{ filtro_temporada }}&sucursal={{ filtro_sucursal or '' }}">
+      <a class="ct-btn" href="/app/cuaderno-temporada/excel?temporada={{ filtro_temporada }}">
         Exportar Excel
       </a>
-      <a class="ct-btn" href="/app/checklist?temporada={{ filtro_temporada }}&sucursal={{ filtro_sucursal or '' }}">
+      <a class="ct-btn" href="/app/checklist?temporada={{ filtro_temporada }}">
         Volver al checklist
       </a>
     </div>

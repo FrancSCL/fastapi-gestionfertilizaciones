@@ -138,12 +138,6 @@
       <option value="{{ t.id }}" {% if filtro_temporada == t.id %}selected{% endif %}>{{ t.temporada }}</option>
       {% endfor %}
     </select>
-    <select name="sucursal" onchange="this.form.submit()">
-      <option value="">Todas las sucursales</option>
-      {% for s in sucursales %}
-      <option value="{{ s.id }}" {% if filtro_sucursal == s.id %}selected{% endif %}>{{ s.sucursal }}</option>
-      {% endfor %}
-    </select>
     <select name="semana" onchange="this.form.submit()">
       {% for s in semanas %}
       <option value="{{ s.id }}" {% if filtro_semana == s.id|string %}selected{% endif %}>
@@ -193,7 +187,7 @@
         <th>Cuartel</th>
         <th>Variedad</th>
         <th>Producto</th>
-        <th class="clk-num">Programado</th>
+        <th class="clk-num">Prog. total<div style="font-weight:400; color:#999; font-size:10px;">dosis · sup</div></th>
         <th class="clk-num">Aplicado</th>
         <th>Estado</th>
         <th></th>
@@ -308,9 +302,9 @@ function abrir(ev, tr) {
   document.getElementById('m-fecha').value = HOY;
   document.getElementById('m-title').textContent = d.nombre;
   document.getElementById('m-sub').textContent =
-    d.cuartel + ' · programado ' + parseFloat(d.prog).toFixed(1) + ' ' + d.uni;
+    d.cuartel + ' · programado ' + parseFloat(d.prog).toFixed(1) + ' ' + d.uni + ' totales';
   document.getElementById('op-prog-txt').textContent =
-    parseFloat(d.prog).toFixed(1) + ' ' + d.uni;
+    parseFloat(d.prog).toFixed(1) + ' ' + d.uni + ' totales';
 
   // Reset radios
   document.querySelector('input[value="programado"]').checked = true;
