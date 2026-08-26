@@ -2353,10 +2353,11 @@ def generar_papeleta_bodega(etiqueta_semana: str, pro: bool = False):
 # CHECKLIST SEMANAL + CUADERNO DE FERTILIZACIONES (beta, gated a fsoto)
 # ══════════════════════════════════════════════════════════════════════════════
 
-def _solo_fsoto(request: Request):
-    """Gate temporal: solo fsoto ve estas vistas. Si no es fsoto, devolvemos 404
-    para que la existencia de la feature sea invisible al resto."""
-    if request.session.get("user_usuario") != "fsoto":
+def _solo_admins(request: Request):
+    """Gate: solo admin / super_admin ven estas vistas. Si no, 404 para que la
+    existencia de la feature sea invisible al resto."""
+    rol = request.session.get("user_rol") or "user"
+    if rol not in ("admin", "super_admin"):
         raise HTTPException(status_code=404, detail="Not Found")
 
 
@@ -2370,7 +2371,7 @@ def web_checklist(
     variedad: str | None = None,
     estado: str | None = None,
 ):
-    _solo_fsoto(request)
+    _solo_admins(request)
     # Parseo tolerante: querystring vacia -> None
     temp_i = _to_int(temporada) if temporada else None
     suc_i = _to_int(sucursal) if sucursal else None
@@ -2450,7 +2451,7 @@ def web_checklist(
 
 @app.get("/app/checklist/sectores")
 def web_checklist_sectores(request: Request, id_cuartel: int):
-    _solo_fsoto(request)
+    _solo_admins(request)
     return JSONResponse({"sectores": get_sectores_cuartel(id_cuartel)})
 
 
@@ -2464,7 +2465,7 @@ async def web_checklist_confirmar(
     id_sector: int | None = Form(None),
     observacion: str | None = Form(None),
 ):
-    _solo_fsoto(request)
+    _solo_admins(request)
     from datetime import datetime
     try:
         fecha = datetime.strptime(fecha_aplicacion, "%Y-%m-%d").date()
@@ -2490,7 +2491,7 @@ async def web_checklist_confirmar(
 
 @app.get("/app/cuaderno/{id_cuartel}", response_class=HTMLResponse)
 def web_cuaderno(request: Request, id_cuartel: int, temporada: int | None = None):
-    _solo_fsoto(request)
+    _solo_admins(request)
     temporadas = get_temporadas()
     id_temp = temporada or (temporadas[0]["id"] if temporadas else None)
     data = get_cuaderno_cuartel(id_cuartel, id_temp)
@@ -2535,7 +2536,7 @@ def web_cuaderno(request: Request, id_cuartel: int, temporada: int | None = None
 
 @app.get("/app/cuaderno/{id_cuartel}/excel")
 def cuaderno_excel(request: Request, id_cuartel: int, temporada: int | None = None):
-    _solo_fsoto(request)
+    _solo_admins(request)
     data = get_cuaderno_cuartel(id_cuartel, temporada)
     if not data["header"]:
         raise HTTPException(404, "Cuartel no encontrado")
@@ -2624,7 +2625,7 @@ async def web_checklist_confirmar_lote(
 ):
     """Confirma multiples aplicaciones en un solo submit.
     items = JSON string con lista de {id_programa, id_producto, cantidad}."""
-    _solo_fsoto(request)
+    _solo_admins(request)
     import json
     from datetime import datetime
     try:
@@ -2667,7 +2668,7 @@ def web_checklist_deshacer(
     id_producto: str = Form(...),
 ):
     """Borra la ULTIMA aplicacion de (programa, producto)."""
-    _solo_fsoto(request)
+    _solo_admins(request)
     deshacer_ultima_aplicacion(id_programa, id_producto)
     referer = request.headers.get("referer", "/app/checklist")
     return RedirectResponse(url=referer, status_code=303)
@@ -2684,7 +2685,7 @@ def web_checklist_exportar(
     estado: str | None = None,
 ):
     """Exporta a Excel las filas del checklist con los filtros aplicados."""
-    _solo_fsoto(request)
+    _solo_admins(request)
     temp_i = _to_int(temporada) if temporada else None
     suc_i  = _to_int(sucursal) if sucursal else None
     esp_i  = _to_int(especie) if especie else None
@@ -2775,7 +2776,7 @@ def web_cuaderno_temporada(
     sucursal: str | None = None,
 ):
     """Cuaderno con TODAS las aplicaciones de la temporada (opcionalmente por sucursal)."""
-    _solo_fsoto(request)
+    _solo_admins(request)
     temp_i = _to_int(temporada) if temporada else None
     suc_i  = _to_int(sucursal) if sucursal else None
     temporadas = get_temporadas()
@@ -2805,7 +2806,7 @@ def cuaderno_temporada_excel(
     temporada: str | None = None,
     sucursal: str | None = None,
 ):
-    _solo_fsoto(request)
+    _solo_admins(request)
     temp_i = _to_int(temporada) if temporada else None
     suc_i  = _to_int(sucursal) if sucursal else None
     temporadas = get_temporadas()
