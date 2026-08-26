@@ -37,6 +37,9 @@ from .queries import (
     listar_usuarios_con_sucursales, actualizar_rol_usuario, set_sucursales_usuario,
     crear_usuario, eliminar_usuario, existe_usuario_nombre,
     actualizar_email_usuario,
+    get_semanas_todas_temporada, get_checklist_semana, get_sectores_cuartel,
+    save_confirmacion_aplicacion, get_cuaderno_cuartel,
+    deshacer_ultima_aplicacion, get_cuaderno_temporada,
 )
 from .pdf_service import build_pdf, build_pdf_bodega, build_pdf_campo
 
@@ -2343,4 +2346,523 @@ def generar_papeleta_bodega(etiqueta_semana: str, pro: bool = False):
         content=pdf_bytes,
         media_type="application/pdf",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# CHECKLIST SEMANAL + CUADERNO DE FERTILIZACIONES (beta, gated a fsoto)
+# ══════════════════════════════════════════════════════════════════════════════
+
+def _solo_fsoto(request: Request):
+    """Gate temporal: solo fsoto ve estas vistas. Si no es fsoto, devolvemos 404
+    para que la existencia de la feature sea invisible al resto."""
+    if request.session.get("user_usuario") != "fsoto":
+        raise HTTPException(status_code=404, detail="Not Found")
+
+
+@app.get("/app/checklist", response_class=HTMLResponse)
+def web_checklist(
+    request: Request,
+    temporada: str | None = None,
+    sucursal: str | None = None,
+    semana: str | None = None,
+    especie: str | None = None,
+    variedad: str | None = None,
+    estado: str | None = None,
+):
+    _solo_fsoto(request)
+    # Parseo tolerante: querystring vacia -> None
+    temp_i = _to_int(temporada) if temporada else None
+    suc_i = _to_int(sucursal) if sucursal else None
+    esp_i = _to_int(especie) if especie else None
+    var_i = _to_int(variedad) if variedad else None
+    estado = (estado or "").strip() or None  # 'pendiente' | 'parcial' | 'aplicado' | None
+    if not (semana or "").strip():
+        semana = None
+
+    temporadas = get_temporadas()
+    id_temp = temp_i or (temporadas[0]["id"] if temporadas else None)
+    semanas = get_semanas_todas_temporada(id_temp) if id_temp else []
+    # Semana default: la que contiene HOY si existe, sino la primera
+    if not semana and semanas:
+        from datetime import date
+        hoy = date.today()
+        for s in semanas:
+            if s["fecha_inicio"] <= hoy <= s["fecha_fin"]:
+                semana = str(s["id"])
+                break
+        if not semana:
+            semana = str(semanas[0]["id"])
+
+    id_suc = _id_sucursal(request, suc_i)
+    filas_raw = get_checklist_semana(semana, id_suc) if semana else []
+
+    # Enriquecer cada fila con estado calculado (para filtrar por estado)
+    def _estado(f):
+        prog = float(f.get("cantidad_programada") or 0)
+        apli = float(f.get("total_aplicado") or 0)
+        if prog <= 0:
+            return "pendiente"
+        pct = apli / prog * 100
+        if pct >= 95: return "aplicado"
+        if pct > 0:   return "parcial"
+        return "pendiente"
+
+    for f in filas_raw:
+        f["estado"] = _estado(f)
+
+    # Aplicar filtros de especie / variedad / estado sobre las filas
+    filas = []
+    for f in filas_raw:
+        if esp_i and f.get("id_especie") != esp_i:
+            continue
+        if var_i and f.get("id_variedad") != var_i:
+            continue
+        if estado and f["estado"] != estado:
+            continue
+        filas.append(f)
+
+    # Catalogos para los selects (basados en las filas de la semana)
+    especies_sem = get_especies(id_sucursal=id_suc)
+    variedades_sem = get_variedades(id_especie=esp_i, id_sucursal=id_suc)
+
+    return templates.TemplateResponse(
+        "checklist.html",
+        {
+            "request": request,
+            "active_page": "checklist",
+            "temporadas": temporadas,
+            "sucursales": request.state.sucursales_all,
+            "semanas": semanas,
+            "especies": especies_sem,
+            "variedades": variedades_sem,
+            "filas": filas,
+            "total_items": len(filas),
+            "filtro_temporada": id_temp,
+            "filtro_sucursal": id_suc,
+            "filtro_semana": semana,
+            "filtro_especie": esp_i,
+            "filtro_variedad": var_i,
+            "filtro_estado": estado,
+        },
+    )
+
+
+@app.get("/app/checklist/sectores")
+def web_checklist_sectores(request: Request, id_cuartel: int):
+    _solo_fsoto(request)
+    return JSONResponse({"sectores": get_sectores_cuartel(id_cuartel)})
+
+
+@app.post("/app/checklist/confirmar", response_class=HTMLResponse)
+async def web_checklist_confirmar(
+    request: Request,
+    id_programa: str = Form(...),
+    id_producto: str = Form(...),
+    cantidad: float = Form(...),
+    fecha_aplicacion: str = Form(...),
+    id_sector: int | None = Form(None),
+    observacion: str | None = Form(None),
+):
+    _solo_fsoto(request)
+    from datetime import datetime
+    try:
+        fecha = datetime.strptime(fecha_aplicacion, "%Y-%m-%d").date()
+    except ValueError:
+        raise HTTPException(400, "Fecha invalida")
+    if cantidad <= 0:
+        raise HTTPException(400, "Cantidad debe ser > 0")
+
+    id_resp = request.session.get("user_id") or 0
+    save_confirmacion_aplicacion(
+        id_programa=id_programa,
+        id_producto=id_producto,
+        cantidad_aplicada=cantidad,
+        fecha_aplicacion=fecha,
+        id_responsable=int(id_resp),
+        id_sector=id_sector,
+        observacion=observacion,
+    )
+    # Redirect back al checklist manteniendo filtros
+    referer = request.headers.get("referer", "/app/checklist")
+    return RedirectResponse(url=referer, status_code=303)
+
+
+@app.get("/app/cuaderno/{id_cuartel}", response_class=HTMLResponse)
+def web_cuaderno(request: Request, id_cuartel: int, temporada: int | None = None):
+    _solo_fsoto(request)
+    temporadas = get_temporadas()
+    id_temp = temporada or (temporadas[0]["id"] if temporadas else None)
+    data = get_cuaderno_cuartel(id_cuartel, id_temp)
+    if not data["header"]:
+        raise HTTPException(404, "Cuartel no encontrado")
+
+    # Agrupar por semana para vista + calcular resumen productos
+    from collections import defaultdict
+    por_semana = defaultdict(list)
+    por_producto: dict = {}
+    for ap in data["aplicaciones"]:
+        por_semana[(ap["id_semana"], ap["etapa"], ap["semana_inicio"])].append(ap)
+        prod = ap["producto"]
+        if prod not in por_producto:
+            por_producto[prod] = {"unidad": ap["unidad"], "total": 0, "n": 0}
+        por_producto[prod]["total"] += float(ap["cantidad"] or 0)
+        por_producto[prod]["n"] += 1
+
+    grupos_semana = [
+        {"id_semana": k[0], "etapa": k[1], "inicio": k[2], "items": v}
+        for k, v in sorted(por_semana.items(), key=lambda x: x[0][2], reverse=True)
+    ]
+    resumen_prod = sorted(
+        [{"nombre": p, **v} for p, v in por_producto.items()],
+        key=lambda x: x["total"], reverse=True
+    )
+
+    return templates.TemplateResponse(
+        "cuaderno.html",
+        {
+            "request": request,
+            "active_page": "cuaderno",
+            "cuartel": data["header"],
+            "grupos_semana": grupos_semana,
+            "resumen_productos": resumen_prod,
+            "total_aplicaciones": len(data["aplicaciones"]),
+            "temporadas": temporadas,
+            "filtro_temporada": id_temp,
+        },
+    )
+
+
+@app.get("/app/cuaderno/{id_cuartel}/excel")
+def cuaderno_excel(request: Request, id_cuartel: int, temporada: int | None = None):
+    _solo_fsoto(request)
+    data = get_cuaderno_cuartel(id_cuartel, temporada)
+    if not data["header"]:
+        raise HTTPException(404, "Cuartel no encontrado")
+
+    from io import BytesIO
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+
+    header = data["header"]
+    aplicaciones = data["aplicaciones"]
+
+    HDR_FILL = PatternFill("solid", fgColor="2d5a1f")
+    HDR_FONT = Font(bold=True, color="FFFFFF", size=10)
+    ZEBRA = PatternFill("solid", fgColor="F4FAF1")
+    THIN = Side(style="thin", color="C5D9BB")
+    BORDER = Border(left=THIN, right=THIN, top=THIN, bottom=THIN)
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Cuaderno"
+    ws["A1"] = f"Cuaderno de fertilizaciones — {header['cuartel']}"
+    ws["A1"].font = Font(bold=True, size=13, color="2d5a1f")
+    ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=8)
+    meta = " · ".join(filter(None, [
+        header.get("sucursal"), header.get("variedad"), header.get("especie"),
+        f"{header.get('sup') or 0} ha",
+    ]))
+    ws["A2"] = meta
+    ws["A2"].font = Font(italic=True, color="666666", size=9)
+    ws.merge_cells(start_row=2, start_column=1, end_row=2, end_column=8)
+
+    HR = 4
+    headers = ["Fecha aplicación", "Semana", "Etapa", "Producto",
+               "Cantidad", "Unidad", "Sector", "Observación", "Responsable"]
+    for i, h in enumerate(headers, start=1):
+        c = ws.cell(row=HR, column=i, value=h)
+        c.fill = HDR_FILL; c.font = HDR_FONT
+        c.alignment = Alignment(horizontal="center", vertical="center")
+        c.border = BORDER
+
+    r = HR + 1
+    for ap in aplicaciones:
+        vals = [
+            ap.get("fecha_aplicacion"),
+            f"Sem {ap.get('id_semana')}" if ap.get("id_semana") else "",
+            ap.get("etapa") or "",
+            ap.get("producto") or "",
+            float(ap.get("cantidad") or 0),
+            ap.get("unidad") or "",
+            ap.get("sector") or "—",
+            ap.get("observacion") or "",
+            ap.get("responsable") or "",
+        ]
+        for ci, v in enumerate(vals, start=1):
+            c = ws.cell(row=r, column=ci, value=v)
+            c.border = BORDER
+            if r % 2 == 0:
+                c.fill = ZEBRA
+        r += 1
+
+    widths = [14, 10, 14, 30, 10, 8, 18, 40, 14]
+    for i, w in enumerate(widths, start=1):
+        ws.column_dimensions[ws.cell(row=HR, column=i).column_letter].width = w
+    ws.freeze_panes = ws.cell(row=HR + 1, column=1).coordinate
+
+    buf = BytesIO()
+    wb.save(buf); buf.seek(0)
+    safe = "".join(c if c.isalnum() else "_" for c in str(header["cuartel"]))[:40]
+    fn = f"cuaderno_{safe}.xlsx"
+    from fastapi.responses import StreamingResponse
+    return StreamingResponse(
+        buf,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="{fn}"'},
+    )
+
+
+@app.post("/app/checklist/confirmar-lote")
+async def web_checklist_confirmar_lote(
+    request: Request,
+    items: str = Form(...),
+    fecha_aplicacion: str = Form(...),
+    modo_cantidad: str = Form("programada"),
+    cantidad_custom: float | None = Form(None),
+    observacion: str | None = Form(None),
+):
+    """Confirma multiples aplicaciones en un solo submit.
+    items = JSON string con lista de {id_programa, id_producto, cantidad}."""
+    _solo_fsoto(request)
+    import json
+    from datetime import datetime
+    try:
+        lote = json.loads(items or "[]")
+    except json.JSONDecodeError:
+        raise HTTPException(400, "items JSON invalido")
+    try:
+        fecha = datetime.strptime(fecha_aplicacion, "%Y-%m-%d").date()
+    except ValueError:
+        raise HTTPException(400, "Fecha invalida")
+
+    id_resp = int(request.session.get("user_id") or 0)
+    n = 0
+    for it in lote:
+        idp = str(it.get("id_programa") or "").strip()
+        idr = str(it.get("id_producto") or "").strip()
+        if not idp or not idr:
+            continue
+        if modo_cantidad == "custom" and cantidad_custom and cantidad_custom > 0:
+            cant = float(cantidad_custom)
+        else:
+            cant = float(it.get("cantidad") or 0)
+        if cant <= 0:
+            continue
+        save_confirmacion_aplicacion(
+            id_programa=idp, id_producto=idr,
+            cantidad_aplicada=cant, fecha_aplicacion=fecha,
+            id_responsable=id_resp, id_sector=None,
+            observacion=observacion,
+        )
+        n += 1
+    referer = request.headers.get("referer", "/app/checklist")
+    return RedirectResponse(url=referer, status_code=303)
+
+
+@app.post("/app/checklist/deshacer")
+def web_checklist_deshacer(
+    request: Request,
+    id_programa: str = Form(...),
+    id_producto: str = Form(...),
+):
+    """Borra la ULTIMA aplicacion de (programa, producto)."""
+    _solo_fsoto(request)
+    deshacer_ultima_aplicacion(id_programa, id_producto)
+    referer = request.headers.get("referer", "/app/checklist")
+    return RedirectResponse(url=referer, status_code=303)
+
+
+@app.get("/app/checklist/exportar-cuaderno")
+def web_checklist_exportar(
+    request: Request,
+    temporada: str | None = None,
+    sucursal: str | None = None,
+    semana: str | None = None,
+    especie: str | None = None,
+    variedad: str | None = None,
+    estado: str | None = None,
+):
+    """Exporta a Excel las filas del checklist con los filtros aplicados."""
+    _solo_fsoto(request)
+    temp_i = _to_int(temporada) if temporada else None
+    suc_i  = _to_int(sucursal) if sucursal else None
+    esp_i  = _to_int(especie) if especie else None
+    var_i  = _to_int(variedad) if variedad else None
+    estado = (estado or "").strip() or None
+    semana = (semana or "").strip() or None
+
+    id_suc = _id_sucursal(request, suc_i)
+    filas = get_checklist_semana(semana, id_suc) if semana else []
+
+    def _est(f):
+        prog = float(f.get("cantidad_programada") or 0)
+        apli = float(f.get("total_aplicado") or 0)
+        if prog <= 0: return "pendiente"
+        pct = apli/prog*100
+        return "aplicado" if pct >= 95 else ("parcial" if pct > 0 else "pendiente")
+    for f in filas:
+        f["estado"] = _est(f)
+    filas = [f for f in filas
+             if (not esp_i or f.get("id_especie") == esp_i)
+             and (not var_i or f.get("id_variedad") == var_i)
+             and (not estado or f["estado"] == estado)]
+
+    from io import BytesIO
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+    HDR = PatternFill("solid", fgColor="2d5a1f")
+    HDF = Font(bold=True, color="FFFFFF", size=10)
+    ZEBRA = PatternFill("solid", fgColor="F4FAF1")
+    T = Side(style="thin", color="C5D9BB")
+    B = Border(left=T, right=T, top=T, bottom=T)
+
+    wb = Workbook(); ws = wb.active
+    ws.title = "Cuaderno filtrado"
+    ws["A1"] = "Cuaderno de fertilizaciones — vista filtrada"
+    ws["A1"].font = Font(bold=True, size=13, color="2d5a1f")
+    ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=9)
+
+    partes = [f"Temp {temp_i}" if temp_i else "", f"Semana {semana}" if semana else "",
+              f"Sucursal {suc_i}" if suc_i else "Todas", f"Estado {estado}" if estado else ""]
+    ws["A2"] = " · ".join(x for x in partes if x)
+    ws["A2"].font = Font(italic=True, color="666666", size=9)
+    ws.merge_cells(start_row=2, start_column=1, end_row=2, end_column=9)
+
+    HR = 4
+    heads = ["Sucursal","Cuartel","Variedad","Especie","Producto",
+             "Programado","Aplicado","Estado","Última aplic."]
+    for i,h in enumerate(heads, 1):
+        c = ws.cell(row=HR, column=i, value=h)
+        c.fill = HDR; c.font = HDF
+        c.alignment = Alignment(horizontal="center", vertical="center")
+        c.border = B
+
+    r = HR+1
+    for f in filas:
+        prog = float(f.get("cantidad_programada") or 0)
+        apli = float(f.get("total_aplicado") or 0)
+        vals = [f.get("sucursal"), f.get("cuartel"), f.get("variedad"), f.get("especie"),
+                f.get("producto"),
+                f"{prog:.1f} {f.get('unidad') or 'kg'}",
+                f"{apli:.1f} {f.get('unidad') or 'kg'}" if apli > 0 else "",
+                f["estado"].capitalize(),
+                f.get("ultima_fecha_aplicacion").strftime("%d/%m/%Y") if f.get("ultima_fecha_aplicacion") else ""]
+        for i,v in enumerate(vals, 1):
+            c = ws.cell(row=r, column=i, value=v)
+            c.border = B
+            if r % 2 == 0: c.fill = ZEBRA
+        r += 1
+
+    for i, w in enumerate([16,26,16,14,26,14,14,12,14], 1):
+        ws.column_dimensions[ws.cell(row=HR, column=i).column_letter].width = w
+    ws.freeze_panes = ws.cell(row=HR+1, column=1).coordinate
+
+    buf = BytesIO(); wb.save(buf); buf.seek(0)
+    fn = f"cuaderno_filtrado_{semana or 'sem'}.xlsx"
+    from fastapi.responses import StreamingResponse
+    return StreamingResponse(
+        buf,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="{fn}"'},
+    )
+
+
+@app.get("/app/cuaderno-temporada", response_class=HTMLResponse)
+def web_cuaderno_temporada(
+    request: Request,
+    temporada: str | None = None,
+    sucursal: str | None = None,
+):
+    """Cuaderno con TODAS las aplicaciones de la temporada (opcionalmente por sucursal)."""
+    _solo_fsoto(request)
+    temp_i = _to_int(temporada) if temporada else None
+    suc_i  = _to_int(sucursal) if sucursal else None
+    temporadas = get_temporadas()
+    id_temp = temp_i or (temporadas[0]["id"] if temporadas else None)
+
+    id_suc = _id_sucursal(request, suc_i)
+    filas = get_cuaderno_temporada(id_temp, id_suc)
+
+    return templates.TemplateResponse(
+        "cuaderno_temporada.html",
+        {
+            "request": request,
+            "active_page": "cuaderno-temporada",
+            "temporadas": temporadas,
+            "sucursales": request.state.sucursales_all,
+            "filas": filas,
+            "total": len(filas),
+            "filtro_temporada": id_temp,
+            "filtro_sucursal": id_suc,
+        },
+    )
+
+
+@app.get("/app/cuaderno-temporada/excel")
+def cuaderno_temporada_excel(
+    request: Request,
+    temporada: str | None = None,
+    sucursal: str | None = None,
+):
+    _solo_fsoto(request)
+    temp_i = _to_int(temporada) if temporada else None
+    suc_i  = _to_int(sucursal) if sucursal else None
+    temporadas = get_temporadas()
+    id_temp = temp_i or (temporadas[0]["id"] if temporadas else None)
+    id_suc = _id_sucursal(request, suc_i)
+    filas = get_cuaderno_temporada(id_temp, id_suc)
+
+    from io import BytesIO
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+    HDR = PatternFill("solid", fgColor="2d5a1f")
+    HDF = Font(bold=True, color="FFFFFF", size=10)
+    ZEBRA = PatternFill("solid", fgColor="F4FAF1")
+    T = Side(style="thin", color="C5D9BB")
+    B = Border(left=T, right=T, top=T, bottom=T)
+
+    wb = Workbook(); ws = wb.active
+    ws.title = "Cuaderno temporada"
+    ws["A1"] = "Cuaderno de fertilizaciones — temporada completa"
+    ws["A1"].font = Font(bold=True, size=13, color="2d5a1f")
+    ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=8)
+
+    HR = 3
+    heads = ["Fecha","Sucursal","Cuartel","Variedad","Producto","Cantidad","Sector","Observación"]
+    for i,h in enumerate(heads, 1):
+        c = ws.cell(row=HR, column=i, value=h)
+        c.fill = HDR; c.font = HDF
+        c.alignment = Alignment(horizontal="center", vertical="center")
+        c.border = B
+
+    r = HR+1
+    for f in filas:
+        vals = [
+            f.get("fecha_aplicacion").strftime("%d/%m/%Y") if f.get("fecha_aplicacion") else "",
+            f.get("sucursal"),
+            f.get("cuartel"),
+            f.get("variedad"),
+            f.get("producto"),
+            f"{float(f.get('cantidad') or 0):.1f} {f.get('unidad') or 'kg'}",
+            f.get("sector") or "—",
+            f.get("observacion") or "",
+        ]
+        for i,v in enumerate(vals, 1):
+            c = ws.cell(row=r, column=i, value=v)
+            c.border = B
+            if r % 2 == 0: c.fill = ZEBRA
+        r += 1
+
+    for i, w in enumerate([12,14,26,16,26,14,18,36], 1):
+        ws.column_dimensions[ws.cell(row=HR, column=i).column_letter].width = w
+    ws.freeze_panes = ws.cell(row=HR+1, column=1).coordinate
+
+    buf = BytesIO(); wb.save(buf); buf.seek(0)
+    fn = f"cuaderno_temporada_{id_temp or 'x'}.xlsx"
+    from fastapi.responses import StreamingResponse
+    return StreamingResponse(
+        buf,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="{fn}"'},
     )

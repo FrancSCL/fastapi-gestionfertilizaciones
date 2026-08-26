@@ -2137,3 +2137,336 @@ def validar_login(usuario: str, contrasena: str) -> dict | None:
                         row["rol"] = "user"
                     return row
                 raise
+
+# ══════════════════════════════════════════════════════════════════════════════
+# CHECKLIST SEMANAL + CUADERNO DE FERTILIZACIONES (beta, gated a fsoto)
+# Feature nueva 2026-07-23: registrar aplicacion real vs programa y llevar
+# cuaderno historico por cuartel. Usa las tablas ya existentes
+# FACT_AREATECNICA_FERTILIZACION_PLAN y ..._APLICACION (venian vacias).
+# ══════════════════════════════════════════════════════════════════════════════
+
+def get_semanas_todas_temporada(id_temporada: int) -> list:
+    """Todas las semanas de una temporada, para el selector de checklist."""
+    sql = """
+        SELECT id, etiqueta_semana, fecha_inicio, fecha_fin
+        FROM DIM_GENERAL_SEMANASTEMPORADA
+        WHERE temporada = %s
+        ORDER BY fecha_inicio
+    """
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(sql, (str(id_temporada),))
+            return cur.fetchall()
+
+
+def get_checklist_semana(id_semana: str, id_sucursal: int | None = None) -> list:
+    """Devuelve filas del checklist: cada producto programado de la semana en cada
+    cuartel visible, con estado de aplicacion. Estado se calcula agregado por
+    (id_programa, id_producto) — si hay al menos una APLICACION, marca aplicado
+    (parcial si suma < programada)."""
+    where_suc = ""
+    # Orden: [subquery_semana, main_semana, sucursales...]
+    if id_sucursal:
+        where_suc = "AND ceco.id_sucursal = %s"
+        params: list = [id_semana, id_semana, id_sucursal]
+    else:
+        ph = ",".join(["%s"] * len(SUCURSALES_VISIBLES))
+        where_suc = f"AND ceco.id_sucursal IN ({ph})"
+        params: list = [id_semana, id_semana] + list(SUCURSALES_VISIBLES)
+
+    sql = f"""
+        SELECT
+            prog.id                                 AS id_programa,
+            prog.id_cuartel,
+            ceco.descripcion_ceco                   AS cuartel,
+            var.id                                  AS id_variedad,
+            var.variedad                            AS variedad,
+            esp.id                                  AS id_especie,
+            esp.especie                             AS especie,
+            suc.sucursal                            AS sucursal,
+            ceco.sup_productiva                     AS sup,
+            prog.semana                             AS id_semana,
+            prog.fecha_inicio,
+            prog.fecha_termino,
+            prog.etapa,
+            pp.id_producto,
+            prod.nombre_comercial                   AS producto,
+            uni.abreviatura                         AS unidad,
+            pp.cantidad_producto                    AS dosis_ha,
+            ROUND(pp.cantidad_producto * COALESCE(ceco.sup_productiva, 0), 2) AS cantidad_programada,
+            COALESCE(agg.total_aplicado, 0)         AS total_aplicado,
+            COALESCE(agg.n_aplicaciones, 0)         AS n_aplicaciones,
+            agg.ultima_fecha                        AS ultima_fecha_aplicacion
+        FROM FACT_AREATECNICA_FERTILIZACION_PROGRAMA prog
+        JOIN FACT_AREATECNICA_FERTILIZACION_PRODUCTOSPROGRAMA pp
+             ON pp.id_fertilizacion = prog.id
+        JOIN DIM_GENERAL_CECO             ceco ON ceco.id = prog.id_cuartel
+        JOIN DIM_GENERAL_SUCURSAL         suc  ON suc.id  = ceco.id_sucursal
+        LEFT JOIN DIM_GENERAL_VARIEDAD    var  ON var.id  = ceco.id_variedad
+        LEFT JOIN DIM_GENERAL_ESPECIE     esp  ON esp.id  = var.id_especie
+        JOIN DIM_AREATECNICA_FITO_PRODUCTO prod ON prod.id = pp.id_producto
+        LEFT JOIN DIM_GENERAL_UNIDAD      uni  ON uni.id  = prod.id_unidad
+        LEFT JOIN (
+            SELECT
+                pl.id_programa,
+                ap.id_producto,
+                SUM(ap.id_cantidad_aplicada) AS total_aplicado,
+                COUNT(*) AS n_aplicaciones,
+                MAX(ap.fecha_aplicacion) AS ultima_fecha
+            FROM FACT_AREATECNICA_FERTILIZACION_APLICACION ap
+            JOIN FACT_AREATECNICA_FERTILIZACION_PLAN pl ON pl.id = ap.id_plan_fertilizacion
+            WHERE pl.id_programa IN (
+                SELECT id FROM FACT_AREATECNICA_FERTILIZACION_PROGRAMA WHERE semana = %s
+            )
+            GROUP BY pl.id_programa, ap.id_producto
+        ) agg ON agg.id_programa = prog.id AND agg.id_producto = pp.id_producto
+        WHERE prog.semana = %s
+          AND pp.cantidad_producto > 0
+          {where_suc}
+        ORDER BY suc.sucursal, ceco.descripcion_ceco, prod.nombre_comercial
+    """
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(sql, params)
+            return cur.fetchall()
+
+
+def get_sectores_cuartel(id_cuartel: int) -> list:
+    """Sectores de riego asociados al cuartel (para el modal de confirmar).
+    Si no hay ninguno, devuelve lista vacia — el modal debe permitir aplicar
+    sin sector especifico en ese caso."""
+    sql = """
+        SELECT DISTINCT s.id, s.nombre
+        FROM PIVOT_AREATECNICA_RIEGO_SECTORCUARTEL psc
+        JOIN DIM_AREATECNICA_RIEGO_SECTOR s ON s.id = psc.id_sector
+        WHERE psc.id_cuartel = %s
+        ORDER BY s.nombre
+    """
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(sql, (id_cuartel,))
+            return cur.fetchall()
+
+
+def save_confirmacion_aplicacion(id_programa: str, id_producto: str,
+                                  cantidad_aplicada: float,
+                                  fecha_aplicacion,
+                                  id_responsable: int,
+                                  id_sector: int | None = None,
+                                  observacion: str | None = None) -> str:
+    """Registra una aplicacion real. Crea (o reusa) una fila en PLAN y
+    agrega la APLICACION. Devuelve el id_aplicacion generado."""
+    import uuid
+    from datetime import datetime
+
+    sector_int = int(id_sector) if id_sector else 0
+    sector_str = str(id_sector) if id_sector else "0"
+    obs = (observacion or "").strip()[:255]
+
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT id FROM FACT_AREATECNICA_FERTILIZACION_PLAN
+                WHERE id_programa = %s AND id_sector_riego = %s LIMIT 1
+            """, (id_programa, sector_int))
+            plan = cur.fetchone()
+            if plan:
+                id_plan = plan["id"]
+            else:
+                id_plan = str(uuid.uuid4())[:45]
+                cur.execute("""
+                    INSERT INTO FACT_AREATECNICA_FERTILIZACION_PLAN
+                        (id, id_programa, fecha_programada, id_sector_riego,
+                         estado, observacion, id_responsable, fecha_creacion)
+                    SELECT %s, id, fecha_inicio, %s, 'aplicado', %s, %s, %s
+                    FROM FACT_AREATECNICA_FERTILIZACION_PROGRAMA WHERE id = %s
+                """, (id_plan, sector_int, obs or None, str(id_responsable),
+                      datetime.now(), id_programa))
+
+            id_apli = str(uuid.uuid4())[:45]
+            cur.execute("""
+                INSERT INTO FACT_AREATECNICA_FERTILIZACION_APLICACION
+                    (id, id_plan_fertilizacion, id_sector_riego, fecha_aplicacion,
+                     id_producto, id_cantidad_aplicada, id_responsable, observacion,
+                     fecha_registro)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+            """, (id_apli, id_plan, sector_str, fecha_aplicacion, id_producto,
+                  cantidad_aplicada, str(id_responsable), obs or None, datetime.now()))
+
+            cur.execute("""
+                UPDATE FACT_AREATECNICA_FERTILIZACION_PLAN pl
+                JOIN (
+                    SELECT id_plan_fertilizacion, SUM(id_cantidad_aplicada) tot
+                    FROM FACT_AREATECNICA_FERTILIZACION_APLICACION
+                    WHERE id_plan_fertilizacion = %s
+                    GROUP BY id_plan_fertilizacion
+                ) ap ON ap.id_plan_fertilizacion = pl.id
+                JOIN FACT_AREATECNICA_FERTILIZACION_PROGRAMA prog ON prog.id = pl.id_programa
+                JOIN FACT_AREATECNICA_FERTILIZACION_PRODUCTOSPROGRAMA pp
+                     ON pp.id_fertilizacion = prog.id
+                JOIN DIM_GENERAL_CECO ceco ON ceco.id = prog.id_cuartel
+                SET pl.estado = CASE
+                    WHEN ap.tot >= (pp.cantidad_producto * COALESCE(ceco.sup_productiva, 0)) * 0.95
+                        THEN 'aplicado'
+                    ELSE 'parcial' END
+                WHERE pl.id = %s
+                  AND pp.id_producto = %s
+            """, (id_plan, id_plan, id_producto))
+        conn.commit()
+    return id_apli
+
+
+def get_cuaderno_cuartel(id_cuartel: int, id_temporada: int | None = None) -> dict:
+    """Header del cuartel + historial de aplicaciones (fecha desc)."""
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT ceco.id, ceco.descripcion_ceco AS cuartel,
+                       ceco.sup_productiva AS sup, var.variedad,
+                       esp.especie, suc.sucursal, suc.id AS id_sucursal
+                FROM DIM_GENERAL_CECO ceco
+                LEFT JOIN DIM_GENERAL_VARIEDAD var ON var.id = ceco.id_variedad
+                LEFT JOIN DIM_GENERAL_ESPECIE  esp ON esp.id = var.id_especie
+                LEFT JOIN DIM_GENERAL_SUCURSAL suc ON suc.id = ceco.id_sucursal
+                WHERE ceco.id = %s
+            """, (id_cuartel,))
+            header = cur.fetchone()
+
+            where_temp = ""
+            params: list = [id_cuartel]
+            if id_temporada:
+                where_temp = "AND prog.id_temporada = %s"
+                params.append(id_temporada)
+
+            cur.execute(f"""
+                SELECT
+                    ap.id                       AS id_aplicacion,
+                    ap.fecha_aplicacion,
+                    ap.fecha_registro,
+                    prod.nombre_comercial       AS producto,
+                    uni.abreviatura             AS unidad,
+                    ap.id_cantidad_aplicada     AS cantidad,
+                    pp.cantidad_producto        AS dosis_ha_prog,
+                    ROUND(pp.cantidad_producto * COALESCE(ceco.sup_productiva, 0), 2)
+                                                AS cantidad_programada,
+                    sec.nombre                  AS sector,
+                    prog.semana                 AS id_semana,
+                    prog.etapa                  AS etapa,
+                    prog.fecha_inicio           AS semana_inicio,
+                    ap.observacion              AS observacion,
+                    usr.usuario                 AS responsable
+                FROM FACT_AREATECNICA_FERTILIZACION_APLICACION ap
+                JOIN FACT_AREATECNICA_FERTILIZACION_PLAN pl ON pl.id = ap.id_plan_fertilizacion
+                JOIN FACT_AREATECNICA_FERTILIZACION_PROGRAMA prog ON prog.id = pl.id_programa
+                JOIN FACT_AREATECNICA_FERTILIZACION_PRODUCTOSPROGRAMA pp
+                     ON pp.id_fertilizacion = prog.id AND pp.id_producto = ap.id_producto
+                JOIN DIM_GENERAL_CECO ceco ON ceco.id = prog.id_cuartel
+                JOIN DIM_AREATECNICA_FITO_PRODUCTO prod ON prod.id = ap.id_producto
+                LEFT JOIN DIM_GENERAL_UNIDAD uni ON uni.id = prod.id_unidad
+                LEFT JOIN DIM_AREATECNICA_RIEGO_SECTOR sec ON sec.id = ap.id_sector_riego
+                LEFT JOIN z_usuarios_test usr ON CAST(usr.id AS CHAR) = ap.id_responsable
+                WHERE prog.id_cuartel = %s
+                  {where_temp}
+                ORDER BY ap.fecha_aplicacion DESC, ap.fecha_registro DESC
+            """, params)
+            aplicaciones = cur.fetchall()
+    return {"header": header, "aplicaciones": aplicaciones}
+
+
+def deshacer_ultima_aplicacion(id_programa: str, id_producto: str) -> bool:
+    """Borra la ultima APLICACION del par (programa, producto). Si el plan
+    queda sin aplicaciones, lo marca como pendiente. Devuelve True si borro
+    algo."""
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT ap.id, ap.id_plan_fertilizacion
+                FROM FACT_AREATECNICA_FERTILIZACION_APLICACION ap
+                JOIN FACT_AREATECNICA_FERTILIZACION_PLAN pl ON pl.id = ap.id_plan_fertilizacion
+                WHERE pl.id_programa = %s AND ap.id_producto = %s
+                ORDER BY ap.fecha_registro DESC LIMIT 1
+            """, (id_programa, id_producto))
+            row = cur.fetchone()
+            if not row:
+                return False
+            id_apli = row["id"]
+            id_plan = row["id_plan_fertilizacion"]
+            cur.execute("DELETE FROM FACT_AREATECNICA_FERTILIZACION_APLICACION WHERE id = %s", (id_apli,))
+
+            # Si al plan no le queda ninguna aplicacion de ESTE producto, dejar
+            # el estado como pendiente (o borrar el plan si esta huerfano por completo)
+            cur.execute("""
+                SELECT COUNT(*) AS n FROM FACT_AREATECNICA_FERTILIZACION_APLICACION
+                WHERE id_plan_fertilizacion = %s
+            """, (id_plan,))
+            if cur.fetchone()["n"] == 0:
+                cur.execute("DELETE FROM FACT_AREATECNICA_FERTILIZACION_PLAN WHERE id = %s", (id_plan,))
+            else:
+                # Recalcular estado (aplicado / parcial) segun sumatoria restante
+                cur.execute("""
+                    UPDATE FACT_AREATECNICA_FERTILIZACION_PLAN pl
+                    JOIN (
+                        SELECT id_plan_fertilizacion, SUM(id_cantidad_aplicada) tot
+                        FROM FACT_AREATECNICA_FERTILIZACION_APLICACION
+                        WHERE id_plan_fertilizacion = %s
+                        GROUP BY id_plan_fertilizacion
+                    ) ap ON ap.id_plan_fertilizacion = pl.id
+                    JOIN FACT_AREATECNICA_FERTILIZACION_PROGRAMA prog ON prog.id = pl.id_programa
+                    JOIN FACT_AREATECNICA_FERTILIZACION_PRODUCTOSPROGRAMA pp
+                         ON pp.id_fertilizacion = prog.id
+                    JOIN DIM_GENERAL_CECO ceco ON ceco.id = prog.id_cuartel
+                    SET pl.estado = CASE
+                        WHEN ap.tot >= (pp.cantidad_producto * COALESCE(ceco.sup_productiva, 0)) * 0.95
+                            THEN 'aplicado' ELSE 'parcial' END
+                    WHERE pl.id = %s
+                      AND pp.id_producto = %s
+                """, (id_plan, id_plan, id_producto))
+        conn.commit()
+    return True
+
+
+def get_cuaderno_temporada(id_temporada: int, id_sucursal: int | None = None) -> list:
+    """Historial completo de aplicaciones de la temporada, opcionalmente acotado
+    por sucursal. Ordenado por fecha desc."""
+    where = ["prog.id_temporada = %s"]
+    params: list = [id_temporada]
+    if id_sucursal:
+        where.append("ceco.id_sucursal = %s")
+        params.append(id_sucursal)
+    else:
+        ph = ",".join(["%s"] * len(SUCURSALES_VISIBLES))
+        where.append(f"ceco.id_sucursal IN ({ph})")
+        params.extend(list(SUCURSALES_VISIBLES))
+    where_sql = " AND ".join(where)
+    sql = f"""
+        SELECT
+            ap.id                       AS id_aplicacion,
+            ap.fecha_aplicacion,
+            ap.fecha_registro,
+            ceco.descripcion_ceco       AS cuartel,
+            ceco.id                     AS id_cuartel,
+            suc.sucursal                AS sucursal,
+            var.variedad                AS variedad,
+            prod.nombre_comercial       AS producto,
+            uni.abreviatura             AS unidad,
+            ap.id_cantidad_aplicada     AS cantidad,
+            sec.nombre                  AS sector,
+            ap.observacion              AS observacion,
+            prog.semana                 AS id_semana,
+            prog.etapa                  AS etapa
+        FROM FACT_AREATECNICA_FERTILIZACION_APLICACION ap
+        JOIN FACT_AREATECNICA_FERTILIZACION_PLAN pl ON pl.id = ap.id_plan_fertilizacion
+        JOIN FACT_AREATECNICA_FERTILIZACION_PROGRAMA prog ON prog.id = pl.id_programa
+        JOIN DIM_GENERAL_CECO ceco ON ceco.id = prog.id_cuartel
+        JOIN DIM_GENERAL_SUCURSAL suc ON suc.id = ceco.id_sucursal
+        LEFT JOIN DIM_GENERAL_VARIEDAD var ON var.id = ceco.id_variedad
+        JOIN DIM_AREATECNICA_FITO_PRODUCTO prod ON prod.id = ap.id_producto
+        LEFT JOIN DIM_GENERAL_UNIDAD uni ON uni.id = prod.id_unidad
+        LEFT JOIN DIM_AREATECNICA_RIEGO_SECTOR sec ON sec.id = ap.id_sector_riego
+        WHERE {where_sql}
+        ORDER BY ap.fecha_aplicacion DESC, ap.fecha_registro DESC
+    """
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(sql, params)
+            return cur.fetchall()

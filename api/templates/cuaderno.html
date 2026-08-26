@@ -1,0 +1,113 @@
+{% extends 'base.html' %}
+
+{% block title %}Cuaderno — {{ cuartel.cuartel }}{% endblock %}
+
+{% block topbar_title %}Cuaderno de fertilizaciones{% endblock %}
+
+{% block content %}
+
+<div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px;">
+  <div>
+    <h2 style="margin: 0; color: #2d5a1f;">{{ cuartel.cuartel }}</h2>
+    <div style="color: #777; font-size: 13px; margin-top: 4px;">
+      {{ cuartel.sucursal }} · {{ cuartel.variedad or '—' }} · {{ cuartel.especie or '' }} · {{ cuartel.sup or 0 }} ha
+    </div>
+  </div>
+  <div style="display: flex; gap: 8px;">
+    <form method="get" style="display: flex; gap: 8px; align-items: center;">
+      <label style="font-size: 12px; color: #555;">Temporada</label>
+      <select name="temporada" class="filter-select" onchange="this.form.submit()">
+        {% for t in temporadas %}
+        <option value="{{ t.id }}" {% if filtro_temporada == t.id %}selected{% endif %}>{{ t.temporada }}</option>
+        {% endfor %}
+      </select>
+    </form>
+    <a href="/app/cuaderno/{{ cuartel.id }}/excel?temporada={{ filtro_temporada }}" class="filter-btn">
+      Descargar Excel
+    </a>
+  </div>
+</div>
+
+<div class="hint" style="margin: 8px 0 16px; color: #888; font-size: 12px;">
+  Vista beta — solo tú la ves. Historial de aplicaciones reales. Total: <strong>{{ total_aplicaciones }}</strong> registros.
+</div>
+
+{% if resumen_productos %}
+<div style="background: white; border: 1px solid #e0e0e0; border-radius: 8px; padding: 16px; margin-bottom: 16px;">
+  <h4 style="margin: 0 0 12px; color: #555;">Resumen por producto</h4>
+  <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+    <thead>
+      <tr style="background: #f5f5f5; text-align: left;">
+        <th style="padding: 6px 8px;">Producto</th>
+        <th style="padding: 6px 8px; text-align: right;">Total aplicado</th>
+        <th style="padding: 6px 8px; text-align: right;">Aplicaciones</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for p in resumen_productos %}
+      <tr style="border-top: 1px solid #eee;">
+        <td style="padding: 6px 8px; font-weight: 500;">{{ p.nombre }}</td>
+        <td style="padding: 6px 8px; text-align: right;">{{ '%.1f'|format(p.total) }} {{ p.unidad or 'kg' }}</td>
+        <td style="padding: 6px 8px; text-align: right; color: #888;">{{ p.n }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+
+{% if not grupos_semana %}
+  <div class="empty-state">
+    <p>No hay aplicaciones registradas para este cuartel en la temporada seleccionada.</p>
+    <p style="color: #888; font-size: 12px;">Registra aplicaciones desde el <a href="/app/checklist">checklist semanal</a>.</p>
+  </div>
+{% else %}
+
+{% for g in grupos_semana %}
+<div style="background: white; border: 1px solid #e0e0e0; border-radius: 8px; padding: 16px; margin-bottom: 12px;">
+  <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 10px; border-bottom: 1px solid #eee; padding-bottom: 6px;">
+    <div>
+      <strong style="color: #2d5a1f;">Sem {{ g.id_semana }}</strong>
+      <span style="color: #777; font-size: 12px; margin-left: 8px;">
+        {{ g.etapa or '' }} · semana del {{ g.inicio.strftime('%d/%m/%Y') if g.inicio else '' }}
+      </span>
+    </div>
+    <span style="color: #888; font-size: 11px;">{{ g["items"]|length }} registro{{ 's' if g["items"]|length != 1 }}</span>
+  </div>
+  <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+    <thead>
+      <tr style="background: #fafafa; text-align: left;">
+        <th style="padding: 4px 8px; color: #666; font-size: 11px;">Fecha</th>
+        <th style="padding: 4px 8px; color: #666; font-size: 11px;">Producto</th>
+        <th style="padding: 4px 8px; color: #666; font-size: 11px; text-align: right;">Cantidad</th>
+        <th style="padding: 4px 8px; color: #666; font-size: 11px;">Sector</th>
+        <th style="padding: 4px 8px; color: #666; font-size: 11px;">Observación</th>
+        <th style="padding: 4px 8px; color: #666; font-size: 11px;">Por</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for ap in g["items"] %}
+      <tr style="border-top: 1px solid #f0f0f0;">
+        <td style="padding: 6px 8px; white-space: nowrap;">{{ ap.fecha_aplicacion.strftime('%d/%m/%Y') if ap.fecha_aplicacion else '—' }}</td>
+        <td style="padding: 6px 8px; font-weight: 500;">{{ ap.producto }}</td>
+        <td style="padding: 6px 8px; text-align: right;">
+          {{ '%.1f'|format(ap.cantidad|float) }} {{ ap.unidad or 'kg' }}
+          {% set prog = ap.cantidad_programada|float %}
+          {% if prog > 0 %}
+            {% set pct = (ap.cantidad|float / prog * 100) %}
+            <span style="color: #999; font-size: 11px;">/ {{ '%.1f'|format(prog) }} prog ({{ '%.0f'|format(pct) }}%)</span>
+          {% endif %}
+        </td>
+        <td style="padding: 6px 8px; color: #666;">{{ ap.sector or '—' }}</td>
+        <td style="padding: 6px 8px; color: #555; font-size: 12px;">{{ ap.observacion or '' }}</td>
+        <td style="padding: 6px 8px; color: #888; font-size: 12px;">{{ ap.responsable or '—' }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endfor %}
+
+{% endif %}
+
+{% endblock %}

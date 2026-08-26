@@ -1,0 +1,387 @@
+{% extends 'base.html' %}
+
+{% block title %}Checklist{% endblock %}
+
+{% block topbar_title %}Checklist semanal{% endblock %}
+
+{% block content %}
+
+<style>
+  .clk-wrap { max-width: 1200px; margin: 0 auto; padding: 0 8px; }
+
+  .clk-filters {
+    display: flex; gap: 8px; flex-wrap: wrap; align-items: center;
+    padding: 12px 0; border-bottom: 1px solid #eee; margin-bottom: 8px;
+  }
+  .clk-filters select {
+    padding: 7px 10px; font-size: 13px; background: white;
+    border: 1px solid #d8d8d8; border-radius: 6px; color: #333;
+    outline: none; min-width: 140px;
+  }
+  .clk-filters select:focus { border-color: #2d5a1f; }
+
+  .clk-actions-top { display: flex; gap: 8px; margin-left: auto; }
+  .clk-btn {
+    padding: 7px 12px; font-size: 13px; border-radius: 6px;
+    border: 1px solid #d8d8d8; background: white; color: #333;
+    cursor: pointer; text-decoration: none;
+    display: inline-flex; align-items: center; gap: 6px;
+  }
+  .clk-btn:hover { background: #f5f5f5; border-color: #2d5a1f; color: #2d5a1f; }
+  .clk-btn-primary {
+    background: #2d5a1f; color: white; border-color: #2d5a1f;
+  }
+  .clk-btn-primary:hover { background: #234717; color: white; border-color: #234717; }
+
+  .clk-count { font-size: 12px; color: #777; padding: 4px 0; }
+
+  .clk-table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 4px; }
+  .clk-table th {
+    background: #fafafa; text-align: left; padding: 8px 10px;
+    font-weight: 600; color: #555; border-bottom: 1px solid #e6e6e6;
+    font-size: 12px; text-transform: uppercase; letter-spacing: 0.03em;
+    position: sticky; top: 0; z-index: 1;
+  }
+  .clk-table td {
+    padding: 10px 10px; border-bottom: 1px solid #f0f0f0;
+    vertical-align: middle;
+  }
+  .clk-row {
+    cursor: pointer; transition: background 0.1s;
+  }
+  .clk-row:hover { background: #fbfcf8; }
+  .clk-row.done { color: #888; }
+
+  .clk-cuartel { font-weight: 600; color: #1a1a1a; }
+  .clk-cuartel a { color: inherit; text-decoration: none; }
+  .clk-cuartel a:hover { color: #2d5a1f; text-decoration: underline; }
+  .clk-sub { color: #999; font-size: 11px; }
+  .clk-num { text-align: right; font-variant-numeric: tabular-nums; }
+
+  .clk-tag {
+    display: inline-block; padding: 2px 8px; border-radius: 10px;
+    font-size: 11px; font-weight: 500;
+  }
+  .clk-tag-pend { background: #f2f2f2; color: #666; }
+  .clk-tag-parc { background: #fff5db; color: #a06c00; }
+  .clk-tag-ok   { background: #e5f2dc; color: #2d5a1f; }
+
+  .clk-row-undo {
+    color: #c33; cursor: pointer; font-size: 11px; padding: 0;
+    background: none; border: none;
+  }
+  .clk-row-undo:hover { text-decoration: underline; }
+
+  .clk-empty {
+    text-align: center; padding: 60px 20px; color: #999; font-size: 13px;
+  }
+
+  /* Modal */
+  .clk-modal {
+    display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.35);
+    z-index: 1000; align-items: center; justify-content: center; padding: 20px;
+  }
+  .clk-modal.show { display: flex; }
+  .clk-modal-inner {
+    background: white; padding: 24px; border-radius: 10px;
+    max-width: 440px; width: 100%; box-shadow: 0 12px 40px rgba(0,0,0,0.15);
+  }
+  .clk-modal h3 { margin: 0 0 4px; font-size: 17px; color: #1a1a1a; }
+  .clk-modal .sub { color: #888; font-size: 12px; margin-bottom: 20px; }
+  .clk-modal label {
+    display: block; font-size: 12px; color: #666; margin: 14px 0 4px;
+    font-weight: 500;
+  }
+  .clk-modal input, .clk-modal textarea, .clk-modal select {
+    width: 100%; padding: 8px 10px; border: 1px solid #e0e0e0;
+    border-radius: 6px; font-size: 14px; box-sizing: border-box;
+    font-family: inherit;
+  }
+  .clk-modal input:focus, .clk-modal textarea:focus, .clk-modal select:focus {
+    outline: none; border-color: #2d5a1f;
+  }
+  .clk-modal .actions {
+    margin-top: 24px; display: flex; gap: 8px; justify-content: flex-end;
+  }
+  .clk-modal button.cancel {
+    background: none; border: none; color: #666; cursor: pointer;
+    padding: 8px 12px; font-size: 14px;
+  }
+
+  .clk-radios {
+    display: flex; flex-direction: column; gap: 6px; margin-top: 6px;
+  }
+  .clk-radios label {
+    display: flex; align-items: center; gap: 8px; margin: 0;
+    cursor: pointer; padding: 10px 12px; border: 1px solid #e6e6e6;
+    border-radius: 6px; font-size: 13px; color: #333; font-weight: normal;
+    transition: all 0.1s;
+  }
+  .clk-radios label:hover { border-color: #2d5a1f; background: #f8faf5; }
+  .clk-radios label.active { border-color: #2d5a1f; background: #f0f5e9; }
+  .clk-radios input[type=radio] {
+    width: auto; margin: 0; accent-color: #2d5a1f;
+  }
+
+  .clk-cant-real {
+    display: none; margin-top: 8px;
+  }
+  .clk-cant-real.show { display: block; }
+</style>
+
+<div class="clk-wrap">
+
+  <!-- Filtros -->
+  <form method="get" action="/app/checklist" class="clk-filters" id="filtros">
+    <select name="temporada" onchange="this.form.submit()">
+      {% for t in temporadas %}
+      <option value="{{ t.id }}" {% if filtro_temporada == t.id %}selected{% endif %}>{{ t.temporada }}</option>
+      {% endfor %}
+    </select>
+    <select name="sucursal" onchange="this.form.submit()">
+      <option value="">Todas las sucursales</option>
+      {% for s in sucursales %}
+      <option value="{{ s.id }}" {% if filtro_sucursal == s.id %}selected{% endif %}>{{ s.sucursal }}</option>
+      {% endfor %}
+    </select>
+    <select name="semana" onchange="this.form.submit()">
+      {% for s in semanas %}
+      <option value="{{ s.id }}" {% if filtro_semana == s.id|string %}selected{% endif %}>
+        {{ s.etiqueta_semana }}{% if s.fecha_inicio %} · {{ s.fecha_inicio.strftime('%d %b') }}{% endif %}
+      </option>
+      {% endfor %}
+    </select>
+    <select name="especie" onchange="document.getElementsByName('variedad')[0].value=''; this.form.submit()">
+      <option value="">Todas las especies</option>
+      {% for e in especies %}
+      <option value="{{ e.id }}" {% if filtro_especie == e.id %}selected{% endif %}>{{ e.especie }}</option>
+      {% endfor %}
+    </select>
+    <select name="variedad" onchange="this.form.submit()">
+      <option value="">Todas las variedades</option>
+      {% for v in variedades %}
+      <option value="{{ v.id }}" {% if filtro_variedad == v.id %}selected{% endif %}>{{ v.variedad }}</option>
+      {% endfor %}
+    </select>
+    <select name="estado" onchange="this.form.submit()">
+      <option value="">Todos los estados</option>
+      <option value="pendiente" {% if filtro_estado == 'pendiente' %}selected{% endif %}>Pendientes</option>
+      <option value="parcial"   {% if filtro_estado == 'parcial'   %}selected{% endif %}>Parciales</option>
+      <option value="aplicado"  {% if filtro_estado == 'aplicado'  %}selected{% endif %}>Aplicados</option>
+    </select>
+
+    <div class="clk-actions-top">
+      <a class="clk-btn" href="/app/checklist/exportar-cuaderno?temporada={{ filtro_temporada }}&sucursal={{ filtro_sucursal or '' }}&semana={{ filtro_semana or '' }}&especie={{ filtro_especie or '' }}&variedad={{ filtro_variedad or '' }}&estado={{ filtro_estado or '' }}">
+        Exportar cuaderno (filtrado)
+      </a>
+      <a class="clk-btn" href="/app/cuaderno-temporada?temporada={{ filtro_temporada }}&sucursal={{ filtro_sucursal or '' }}">
+        Cuaderno temporada
+      </a>
+    </div>
+  </form>
+
+  <div class="clk-count">{{ total_items }} producto(s) en el listado · click en la fila para confirmar</div>
+
+  {% if not filas %}
+    <div class="clk-empty">Nada coincide con los filtros aplicados.</div>
+  {% else %}
+
+  <table class="clk-table">
+    <thead>
+      <tr>
+        <th>Sucursal</th>
+        <th>Cuartel</th>
+        <th>Variedad</th>
+        <th>Producto</th>
+        <th class="clk-num">Programado</th>
+        <th class="clk-num">Aplicado</th>
+        <th>Estado</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for f in filas %}
+      {% set prog = f.cantidad_programada|float %}
+      {% set apli = f.total_aplicado|float %}
+      {% set uni = f.unidad or 'kg' %}
+      <tr class="clk-row {% if f.estado == 'aplicado' %}done{% endif %}"
+          onclick="abrir(event, this)"
+          data-idprog="{{ f.id_programa }}"
+          data-idprod="{{ f.id_producto }}"
+          data-prog="{{ prog }}"
+          data-uni="{{ uni }}"
+          data-nombre="{{ f.producto|e }}"
+          data-cuartel="{{ f.cuartel|e }}"
+          data-idcuartel="{{ f.id_cuartel }}">
+        <td>{{ f.sucursal }}</td>
+        <td class="clk-cuartel">
+          <a href="/app/cuaderno/{{ f.id_cuartel }}?temporada={{ filtro_temporada }}"
+             onclick="event.stopPropagation()">{{ f.cuartel }}</a>
+          <div class="clk-sub">{{ f.sup or 0 }} ha</div>
+        </td>
+        <td>{{ f.variedad or '—' }}<div class="clk-sub">{{ f.especie or '' }}</div></td>
+        <td>{{ f.producto }}<div class="clk-sub">{{ '%.2f'|format(f.dosis_ha|float) }} {{ uni }}/ha</div></td>
+        <td class="clk-num">{{ '%.1f'|format(prog) }} {{ uni }}</td>
+        <td class="clk-num">
+          {% if apli > 0 %}{{ '%.1f'|format(apli) }} {{ uni }}
+            {% if f.ultima_fecha_aplicacion %}<div class="clk-sub">{{ f.ultima_fecha_aplicacion.strftime('%d/%m') }}</div>{% endif %}
+          {% else %}<span style="color:#bbb">—</span>{% endif %}
+        </td>
+        <td>
+          {% if f.estado == 'aplicado' %}<span class="clk-tag clk-tag-ok">Aplicado</span>
+          {% elif f.estado == 'parcial' %}<span class="clk-tag clk-tag-parc">Parcial</span>
+          {% else %}<span class="clk-tag clk-tag-pend">Pendiente</span>{% endif %}
+        </td>
+        <td>
+          {% if apli > 0 %}
+          <button class="clk-row-undo"
+                  onclick="event.stopPropagation(); deshacer('{{ f.id_programa }}','{{ f.id_producto }}','{{ f.producto|e }}')">
+            Deshacer
+          </button>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  {% endif %}
+</div>
+
+<!-- Modal confirmar (una sola fila) -->
+<div class="clk-modal" id="modal">
+  <div class="clk-modal-inner">
+    <h3 id="m-title">Confirmar aplicación</h3>
+    <div class="sub" id="m-sub">—</div>
+
+    <form method="post" action="/app/checklist/confirmar" id="fconfirm">
+      <input type="hidden" name="id_programa" id="m-idp">
+      <input type="hidden" name="id_producto" id="m-idr">
+
+      <label>Fecha de aplicación</label>
+      <input type="date" name="fecha_aplicacion" id="m-fecha" required>
+
+      <label>¿Se aplicó lo programado?</label>
+      <div class="clk-radios">
+        <label id="op-si">
+          <input type="radio" name="opcion" value="programado" checked onchange="switchOpcion(this)">
+          <span>Sí, apliqué lo programado (<b id="op-prog-txt">—</b>)</span>
+        </label>
+        <label id="op-otro">
+          <input type="radio" name="opcion" value="otro" onchange="switchOpcion(this)">
+          <span>Apliqué una cantidad distinta</span>
+        </label>
+        <div class="clk-cant-real" id="cant-real-wrap">
+          <input type="number" name="cantidad_real" id="m-cant-real"
+                 step="0.01" min="0.01" placeholder="Cantidad real aplicada (<span id='m-uni'>kg</span>)">
+        </div>
+      </div>
+
+      <label>Observaciones</label>
+      <textarea name="observacion" rows="3" maxlength="255"
+                placeholder="Ej: se aplicó parcial por lluvia · condiciones · nota para el cuaderno..."></textarea>
+
+      <div class="actions">
+        <button type="button" class="cancel" onclick="cerrarModal()">Cancelar</button>
+        <button type="submit" class="clk-btn clk-btn-primary">Guardar</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Form oculto para deshacer -->
+<form id="fundo" method="post" action="/app/checklist/deshacer" style="display:none;">
+  <input type="hidden" name="id_programa" id="undo-idp">
+  <input type="hidden" name="id_producto" id="undo-idr">
+</form>
+
+<script>
+const HOY = new Date().toISOString().slice(0,10);
+
+function abrir(ev, tr) {
+  // No abrir si el click fue en un link o botón dentro de la fila
+  if (ev.target.tagName === 'A' || ev.target.tagName === 'BUTTON') return;
+
+  const d = tr.dataset;
+  document.getElementById('m-idp').value = d.idprog;
+  document.getElementById('m-idr').value = d.idprod;
+  document.getElementById('m-fecha').value = HOY;
+  document.getElementById('m-title').textContent = d.nombre;
+  document.getElementById('m-sub').textContent =
+    d.cuartel + ' · programado ' + parseFloat(d.prog).toFixed(1) + ' ' + d.uni;
+  document.getElementById('op-prog-txt').textContent =
+    parseFloat(d.prog).toFixed(1) + ' ' + d.uni;
+
+  // Reset radios
+  document.querySelector('input[value="programado"]').checked = true;
+  document.getElementById('cant-real-wrap').classList.remove('show');
+  document.getElementById('m-cant-real').value = '';
+
+  // Set default cantidad = programada por si el usuario cambia a "otro"
+  document.getElementById('m-cant-real').setAttribute('placeholder',
+    'Cantidad real (' + d.uni + ')');
+
+  actualizarLabelsRadio();
+  document.getElementById('modal').classList.add('show');
+}
+
+function switchOpcion(el) {
+  actualizarLabelsRadio();
+  const isOtro = el.value === 'otro';
+  document.getElementById('cant-real-wrap').classList.toggle('show', isOtro);
+  const inp = document.getElementById('m-cant-real');
+  inp.required = isOtro;
+  if (isOtro) setTimeout(() => inp.focus(), 100);
+}
+
+function actualizarLabelsRadio() {
+  document.querySelectorAll('.clk-radios label').forEach(l => l.classList.remove('active'));
+  const chk = document.querySelector('.clk-radios input:checked');
+  if (chk) chk.closest('label').classList.add('active');
+}
+
+function cerrarModal() {
+  document.getElementById('modal').classList.remove('show');
+}
+
+document.getElementById('modal').addEventListener('click', function(e){
+  if (e.target === this) cerrarModal();
+});
+
+// Al submit, transformar "opcion" en "cantidad" (hidden)
+document.getElementById('fconfirm').addEventListener('submit', function(e){
+  const opcion = document.querySelector('input[name="opcion"]:checked').value;
+  let cantidad;
+  if (opcion === 'programado') {
+    // Sacar la cantidad programada del data del modal (guardada en m-sub)
+    const tr = document.querySelector('.clk-row[data-idprog="' + document.getElementById('m-idp').value + '"][data-idprod="' + document.getElementById('m-idr').value + '"]');
+    cantidad = tr ? parseFloat(tr.dataset.prog) : 0;
+  } else {
+    cantidad = parseFloat(document.getElementById('m-cant-real').value || 0);
+  }
+  if (!cantidad || cantidad <= 0) {
+    e.preventDefault();
+    alert('Cantidad inválida');
+    return;
+  }
+  // Inyectar hidden cantidad
+  let hid = this.querySelector('input[name="cantidad"]');
+  if (!hid) {
+    hid = document.createElement('input');
+    hid.type = 'hidden'; hid.name = 'cantidad';
+    this.appendChild(hid);
+  }
+  hid.value = cantidad;
+});
+
+function deshacer(idProg, idProd, nombre) {
+  if (!confirm('Deshacer última aplicación de "' + nombre + '"?')) return;
+  document.getElementById('undo-idp').value = idProg;
+  document.getElementById('undo-idr').value = idProd;
+  document.getElementById('fundo').submit();
+}
+
+actualizarLabelsRadio();
+</script>
+
+{% endblock %}

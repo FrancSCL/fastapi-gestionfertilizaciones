@@ -1,0 +1,108 @@
+{% extends 'base.html' %}
+
+{% block title %}Cuaderno temporada{% endblock %}
+
+{% block topbar_title %}Cuaderno de fertilizaciones — temporada completa{% endblock %}
+
+{% block content %}
+
+<style>
+  .ct-wrap { max-width: 1200px; margin: 0 auto; padding: 0 8px; }
+  .ct-filters {
+    display: flex; gap: 8px; flex-wrap: wrap; align-items: center;
+    padding: 12px 0; border-bottom: 1px solid #eee; margin-bottom: 8px;
+  }
+  .ct-filters select {
+    padding: 7px 10px; font-size: 13px; background: white;
+    border: 1px solid #d8d8d8; border-radius: 6px; color: #333;
+    outline: none; min-width: 140px;
+  }
+  .ct-actions { margin-left: auto; display: flex; gap: 8px; }
+  .ct-btn {
+    padding: 7px 12px; font-size: 13px; border-radius: 6px;
+    border: 1px solid #d8d8d8; background: white; color: #333;
+    cursor: pointer; text-decoration: none;
+  }
+  .ct-btn:hover { background: #f5f5f5; border-color: #2d5a1f; color: #2d5a1f; }
+  .ct-count { font-size: 12px; color: #777; padding: 4px 0; }
+  .ct-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .ct-table th {
+    background: #fafafa; text-align: left; padding: 8px 10px;
+    font-weight: 600; color: #555; border-bottom: 1px solid #e6e6e6;
+    font-size: 12px; text-transform: uppercase; letter-spacing: 0.03em;
+    position: sticky; top: 0; z-index: 1;
+  }
+  .ct-table td { padding: 8px 10px; border-bottom: 1px solid #f0f0f0; }
+  .ct-table tbody tr:hover { background: #fbfcf8; }
+  .ct-empty {
+    text-align: center; padding: 60px 20px; color: #999; font-size: 13px;
+  }
+  .ct-cuartel a { color: #1a1a1a; text-decoration: none; font-weight: 500; }
+  .ct-cuartel a:hover { color: #2d5a1f; text-decoration: underline; }
+</style>
+
+<div class="ct-wrap">
+
+  <form method="get" action="/app/cuaderno-temporada" class="ct-filters">
+    <select name="temporada" onchange="this.form.submit()">
+      {% for t in temporadas %}
+      <option value="{{ t.id }}" {% if filtro_temporada == t.id %}selected{% endif %}>{{ t.temporada }}</option>
+      {% endfor %}
+    </select>
+    <select name="sucursal" onchange="this.form.submit()">
+      <option value="">Todas las sucursales</option>
+      {% for s in sucursales %}
+      <option value="{{ s.id }}" {% if filtro_sucursal == s.id %}selected{% endif %}>{{ s.sucursal }}</option>
+      {% endfor %}
+    </select>
+    <div class="ct-actions">
+      <a class="ct-btn" href="/app/cuaderno-temporada/excel?temporada={{ filtro_temporada }}&sucursal={{ filtro_sucursal or '' }}">
+        Exportar Excel
+      </a>
+      <a class="ct-btn" href="/app/checklist?temporada={{ filtro_temporada }}&sucursal={{ filtro_sucursal or '' }}">
+        Volver al checklist
+      </a>
+    </div>
+  </form>
+
+  <div class="ct-count">{{ total }} aplicación(es) registradas en la temporada.</div>
+
+  {% if not filas %}
+    <div class="ct-empty">Sin aplicaciones registradas para los filtros aplicados.</div>
+  {% else %}
+  <table class="ct-table">
+    <thead>
+      <tr>
+        <th>Fecha</th>
+        <th>Sucursal</th>
+        <th>Cuartel</th>
+        <th>Variedad</th>
+        <th>Producto</th>
+        <th style="text-align:right;">Cantidad</th>
+        <th>Sector</th>
+        <th>Observación</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for f in filas %}
+      <tr>
+        <td>{{ f.fecha_aplicacion.strftime('%d/%m/%Y') if f.fecha_aplicacion else '—' }}</td>
+        <td>{{ f.sucursal }}</td>
+        <td class="ct-cuartel">
+          <a href="/app/cuaderno/{{ f.id_cuartel }}?temporada={{ filtro_temporada }}">{{ f.cuartel }}</a>
+        </td>
+        <td>{{ f.variedad or '—' }}</td>
+        <td>{{ f.producto }}</td>
+        <td style="text-align:right; font-variant-numeric: tabular-nums;">
+          {{ '%.1f'|format(f.cantidad|float) }} {{ f.unidad or 'kg' }}
+        </td>
+        <td>{{ f.sector or '—' }}</td>
+        <td style="color:#555;">{{ f.observacion or '' }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+</div>
+
+{% endblock %}
