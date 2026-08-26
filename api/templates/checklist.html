@@ -214,7 +214,11 @@
           <div class="clk-sub">{{ f.sup or 0 }} ha</div>
         </td>
         <td>{{ f.variedad or '—' }}<div class="clk-sub">{{ f.especie or '' }}</div></td>
-        <td>{{ f.producto }}<div class="clk-sub">{{ '%.2f'|format(f.dosis_ha|float) }} {{ uni }}/ha</div></td>
+        <td>
+          {{ f.producto }}
+          {% if f.codigo_softland %}<span class="clk-tag clk-tag-pend" style="margin-left:6px; font-size:10px;">Softland {{ f.codigo_softland }}</span>{% endif %}
+          <div class="clk-sub">{{ '%.2f'|format(f.dosis_ha|float) }} {{ uni }}/ha</div>
+        </td>
         <td class="clk-num">{{ '%.1f'|format(prog) }} {{ uni }}</td>
         <td class="clk-num">
           {% if apli > 0 %}{{ '%.1f'|format(apli) }} {{ uni }}

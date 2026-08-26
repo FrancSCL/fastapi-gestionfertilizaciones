@@ -2731,7 +2731,7 @@ def web_checklist_exportar(
     ws.merge_cells(start_row=2, start_column=1, end_row=2, end_column=9)
 
     HR = 4
-    heads = ["Sucursal","Cuartel","Variedad","Especie","Producto",
+    heads = ["Sucursal","Cuartel","Variedad","Especie","Producto","Cód. Softland",
              "Programado","Aplicado","Estado","Última aplic."]
     for i,h in enumerate(heads, 1):
         c = ws.cell(row=HR, column=i, value=h)
@@ -2744,7 +2744,7 @@ def web_checklist_exportar(
         prog = float(f.get("cantidad_programada") or 0)
         apli = float(f.get("total_aplicado") or 0)
         vals = [f.get("sucursal"), f.get("cuartel"), f.get("variedad"), f.get("especie"),
-                f.get("producto"),
+                f.get("producto"), f.get("codigo_softland"),
                 f"{prog:.1f} {f.get('unidad') or 'kg'}",
                 f"{apli:.1f} {f.get('unidad') or 'kg'}" if apli > 0 else "",
                 f["estado"].capitalize(),
@@ -2755,7 +2755,7 @@ def web_checklist_exportar(
             if r % 2 == 0: c.fill = ZEBRA
         r += 1
 
-    for i, w in enumerate([16,26,16,14,26,14,14,12,14], 1):
+    for i, w in enumerate([16,26,16,14,26,14,14,14,12,14], 1):
         ws.column_dimensions[ws.cell(row=HR, column=i).column_letter].width = w
     ws.freeze_panes = ws.cell(row=HR+1, column=1).coordinate
 
@@ -2827,10 +2827,10 @@ def cuaderno_temporada_excel(
     ws.title = "Cuaderno temporada"
     ws["A1"] = "Cuaderno de fertilizaciones — temporada completa"
     ws["A1"].font = Font(bold=True, size=13, color="2d5a1f")
-    ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=8)
+    ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=9)
 
     HR = 3
-    heads = ["Fecha","Sucursal","Cuartel","Variedad","Producto","Cantidad","Sector","Observación"]
+    heads = ["Fecha","Sucursal","Cuartel","Variedad","Producto","Cód. Softland","Cantidad","Sector","Observación"]
     for i,h in enumerate(heads, 1):
         c = ws.cell(row=HR, column=i, value=h)
         c.fill = HDR; c.font = HDF
@@ -2845,6 +2845,7 @@ def cuaderno_temporada_excel(
             f.get("cuartel"),
             f.get("variedad"),
             f.get("producto"),
+            f.get("codigo_softland"),
             f"{float(f.get('cantidad') or 0):.1f} {f.get('unidad') or 'kg'}",
             f.get("sector") or "—",
             f.get("observacion") or "",
@@ -2855,7 +2856,7 @@ def cuaderno_temporada_excel(
             if r % 2 == 0: c.fill = ZEBRA
         r += 1
 
-    for i, w in enumerate([12,14,26,16,26,14,18,36], 1):
+    for i, w in enumerate([12,14,26,16,26,14,14,18,36], 1):
         ws.column_dimensions[ws.cell(row=HR, column=i).column_letter].width = w
     ws.freeze_panes = ws.cell(row=HR+1, column=1).coordinate
 

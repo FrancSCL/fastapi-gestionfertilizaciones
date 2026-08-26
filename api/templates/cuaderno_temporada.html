@@ -86,7 +86,10 @@
           <a href="/app/cuaderno/{{ f.id_cuartel }}?temporada={{ filtro_temporada }}">{{ f.cuartel }}</a>
         </td>
         <td>{{ f.variedad or '—' }}</td>
-        <td>{{ f.producto }}</td>
+        <td>
+          {{ f.producto }}
+          {% if f.codigo_softland %}<div class="clk-sub" style="color:#999; font-size:11px;">Softland {{ f.codigo_softland }}</div>{% endif %}
+        </td>
         <td style="text-align:right; font-variant-numeric: tabular-nums;">
           {{ '%.1f'|format(f.cantidad|float) }} {{ f.unidad or 'kg' }}
         </td>

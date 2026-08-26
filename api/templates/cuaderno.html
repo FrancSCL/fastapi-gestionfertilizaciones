@@ -89,7 +89,10 @@
       {% for ap in g["items"] %}
       <tr style="border-top: 1px solid #f0f0f0;">
         <td style="padding: 6px 8px; white-space: nowrap;">{{ ap.fecha_aplicacion.strftime('%d/%m/%Y') if ap.fecha_aplicacion else '—' }}</td>
-        <td style="padding: 6px 8px; font-weight: 500;">{{ ap.producto }}</td>
+        <td style="padding: 6px 8px; font-weight: 500;">
+          {{ ap.producto }}
+          {% if ap.codigo_softland %}<div style="color:#999; font-size:11px; font-weight:400;">Softland {{ ap.codigo_softland }}</div>{% endif %}
+        </td>
         <td style="padding: 6px 8px; text-align: right;">
           {{ '%.1f'|format(ap.cantidad|float) }} {{ ap.unidad or 'kg' }}
           {% set prog = ap.cantidad_programada|float %}
