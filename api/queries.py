@@ -2192,6 +2192,9 @@ def get_checklist_semana(id_semana: str, id_sucursal: int | None = None) -> list
             pp.id_producto,
             prod.nombre_comercial                   AS producto,
             prod.codigo_softland                    AS codigo_softland,
+            COALESCE(nut.n, 0)                      AS n_pct,
+            COALESCE(nut.p, 0)                      AS p_pct,
+            COALESCE(nut.k, 0)                      AS k_pct,
             uni.abreviatura                         AS unidad,
             pp.cantidad_producto                    AS dosis_ha,
             ROUND(pp.cantidad_producto * COALESCE(ceco.sup_productiva, 0), 2) AS cantidad_programada,
@@ -2206,6 +2209,7 @@ def get_checklist_semana(id_semana: str, id_sucursal: int | None = None) -> list
         LEFT JOIN DIM_GENERAL_VARIEDAD    var  ON var.id  = ceco.id_variedad
         LEFT JOIN DIM_GENERAL_ESPECIE     esp  ON esp.id  = var.id_especie
         JOIN DIM_AREATECNICA_FITO_PRODUCTO prod ON prod.id = pp.id_producto
+        LEFT JOIN DIM_AREATECNICA_FITO_PRODUCTONUTRIENTES nut ON nut.id_producto = prod.id
         LEFT JOIN DIM_GENERAL_UNIDAD      uni  ON uni.id  = prod.id_unidad
         LEFT JOIN (
             SELECT

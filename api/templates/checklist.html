@@ -217,7 +217,16 @@
         <td>
           {{ f.producto }}
           {% if f.codigo_softland %}<span class="clk-tag clk-tag-pend" style="margin-left:6px; font-size:10px;">Softland {{ f.codigo_softland }}</span>{% endif %}
-          <div class="clk-sub">{{ '%.2f'|format(f.dosis_ha|float) }} {{ uni }}/ha</div>
+          <div class="clk-sub">
+            {{ '%.2f'|format(f.dosis_ha|float) }} {{ uni }}/ha
+            {% set npk = [] %}
+            {% if f.n_pct and f.n_pct|float > 0 %}{% set _ = npk.append('N ' ~ ('%g'|format(f.n_pct|float * 100)) ~ '%') %}{% endif %}
+            {% if f.p_pct and f.p_pct|float > 0 %}{% set _ = npk.append('P ' ~ ('%g'|format(f.p_pct|float * 100)) ~ '%') %}{% endif %}
+            {% if f.k_pct and f.k_pct|float > 0 %}{% set _ = npk.append('K ' ~ ('%g'|format(f.k_pct|float * 100)) ~ '%') %}{% endif %}
+            {% if npk %}
+            <span style="color:#7c9a5c; margin-left:8px;">· {{ npk|join(' · ') }}</span>
+            {% endif %}
+          </div>
         </td>
         <td class="clk-num">{{ '%.1f'|format(prog) }} {{ uni }}</td>
         <td class="clk-num">

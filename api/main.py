@@ -2732,6 +2732,7 @@ def web_checklist_exportar(
 
     HR = 4
     heads = ["Sucursal","Cuartel","Variedad","Especie","Producto","Cód. Softland",
+             "N %","P %","K %",
              "Programado","Aplicado","Estado","Última aplic."]
     for i,h in enumerate(heads, 1):
         c = ws.cell(row=HR, column=i, value=h)
@@ -2743,8 +2744,14 @@ def web_checklist_exportar(
     for f in filas:
         prog = float(f.get("cantidad_programada") or 0)
         apli = float(f.get("total_aplicado") or 0)
+        npct = float(f.get("n_pct") or 0)
+        ppct = float(f.get("p_pct") or 0)
+        kpct = float(f.get("k_pct") or 0)
         vals = [f.get("sucursal"), f.get("cuartel"), f.get("variedad"), f.get("especie"),
                 f.get("producto"), f.get("codigo_softland"),
+                round(npct*100, 1) if npct > 0 else "",
+                round(ppct*100, 1) if ppct > 0 else "",
+                round(kpct*100, 1) if kpct > 0 else "",
                 f"{prog:.1f} {f.get('unidad') or 'kg'}",
                 f"{apli:.1f} {f.get('unidad') or 'kg'}" if apli > 0 else "",
                 f["estado"].capitalize(),
@@ -2755,7 +2762,7 @@ def web_checklist_exportar(
             if r % 2 == 0: c.fill = ZEBRA
         r += 1
 
-    for i, w in enumerate([16,26,16,14,26,14,14,14,12,14], 1):
+    for i, w in enumerate([16,26,16,14,26,14,7,7,7,14,14,12,14], 1):
         ws.column_dimensions[ws.cell(row=HR, column=i).column_letter].width = w
     ws.freeze_panes = ws.cell(row=HR+1, column=1).coordinate
 
