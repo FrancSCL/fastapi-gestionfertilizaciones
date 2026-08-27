@@ -2354,10 +2354,9 @@ def generar_papeleta_bodega(etiqueta_semana: str, pro: bool = False):
 # ══════════════════════════════════════════════════════════════════════════════
 
 def _solo_admins(request: Request):
-    """Gate: solo admin / super_admin ven estas vistas. Si no, 404 para que la
-    existencia de la feature sea invisible al resto."""
-    rol = request.session.get("user_rol") or "user"
-    if rol not in ("admin", "super_admin"):
+    """Gate para checklist/cuaderno. Abierto a todos los roles (user, admin,
+    super_admin). Requiere sesion iniciada; si no hay usuario, 404."""
+    if not request.session.get("user_id"):
         raise HTTPException(status_code=404, detail="Not Found")
 
 

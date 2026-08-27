@@ -58,7 +58,6 @@
           Unidades Req.
         </a>
 
-        {% if request.session.get('user_rol') in ('admin', 'super_admin') %}
         <a href="/app/checklist"
            class="nav-item {% if active_page in ('checklist', 'cuaderno', 'cuaderno-temporada') %}active{% endif %}">
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
@@ -70,7 +69,6 @@
           </svg>
           Confirmación
         </a>
-        {% endif %}
 
         <a href="/app/descuento-bodega"
            class="nav-item {% if active_page == 'descuento-bodega' %}active{% endif %}">
