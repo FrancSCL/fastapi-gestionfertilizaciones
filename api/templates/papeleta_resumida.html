@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Papeleta resumida · {{ num_orden }}</title>
+<style>
+  @page { size: A4; margin: 12mm 11mm 12mm 11mm; }
+  :root {
+    --verde-osc: #2f5233;
+    --verde-med: #4b7a3a;
+    --verde-claro: #eef4ea;
+    --verde-borde: #b9cfae;
+    --naranja: #c47a12;
+    --fondo-naranja: #fbeedd;
+    --txt: #1c1c1c;
+    --gris: #6b6b6b;
+  }
+  * { box-sizing: border-box; }
+  body { font-family: "Liberation Sans", Arial, Helvetica, sans-serif; font-size: 8.4pt; color: var(--txt); margin: 0; }
+
+  .cab { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2.2pt solid var(--verde-osc); padding-bottom: 6pt; }
+  .cab .razon { font-size: 12pt; font-weight: 700; color: var(--verde-osc); }
+  .cab .fundo { font-size: 9.5pt; font-weight: 700; margin-top: 1pt; }
+  .cab .sub { font-size: 7pt; color: var(--gris); margin-top: 2pt; }
+  .orden { border: 1pt solid var(--verde-borde); background: var(--verde-claro); border-radius: 4pt; padding: 5pt 9pt; text-align: right; min-width: 135pt; }
+  .orden .eti { font-size: 6.5pt; color: var(--gris); letter-spacing: .5pt; }
+  .orden .num { font-size: 7.6pt; font-weight: 700; }
+  .orden .caseta { font-size: 13pt; font-weight: 700; color: var(--verde-osc); }
+
+  .paneles { display: flex; gap: 9pt; margin-top: 8pt; }
+  .panel { flex: 1; border: 1pt solid var(--verde-borde); background: var(--verde-claro); border-radius: 4pt; padding: 5pt 8pt 6pt; }
+  .panel h3 { margin: 0 0 4pt; font-size: 7.4pt; letter-spacing: .5pt; color: var(--verde-osc); border-bottom: 1pt solid var(--verde-borde); padding-bottom: 2pt; }
+  .campos { display: flex; flex-wrap: wrap; gap: 3pt 14pt; }
+  .campo { min-width: 60pt; }
+  .campo .k { font-size: 6.4pt; color: var(--gris); text-transform: uppercase; }
+  .campo .v { font-size: 8.2pt; font-weight: 700; min-height: 10pt; }
+  .campo .linea { border-bottom: 0.8pt solid #4b4b4b; min-width: 62pt; height: 11pt; }
+
+  .titulo-tabla { margin: 8pt 0 3pt; font-size: 7.2pt; font-weight: 700; color: var(--verde-osc); letter-spacing: .4pt; }
+  table { width: 100%; border-collapse: collapse; }
+  table.resumen thead th { background: var(--verde-osc); color: #fff; font-size: 7pt; letter-spacing: .3pt; padding: 4pt 6pt; text-align: left; }
+  table.resumen th.num, table.resumen td.num { text-align: right; }
+  table.resumen td { padding: 3.6pt 6pt; border-bottom: 0.8pt solid var(--verde-borde); font-size: 8.4pt; }
+  table.resumen td.npk { color: var(--verde-med); font-weight: 700; }
+  table.resumen td.sacos { background: var(--fondo-naranja); color: var(--naranja); font-weight: 700; text-align: right; }
+  table.resumen th.sacos { text-align: right; }
+
+  .equipo { background: var(--verde-osc); color: #fff; font-weight: 700; letter-spacing: .4pt; padding: 4pt 8pt; margin: 8pt 0 4pt; border-radius: 2pt; font-size: 8pt; page-break-after: avoid; }
+  .grupo { border: 1pt solid var(--verde-borde); border-radius: 3pt; margin-bottom: 5pt; page-break-inside: avoid; background: #fff; }
+  .grupo .gcab { background: var(--verde-med); color: #fff; padding: 3.4pt 8pt; display: flex; justify-content: space-between; align-items: center; font-size: 8pt; font-weight: 700; }
+  .chip { border: 0.8pt solid #fff; border-radius: 8pt; font-size: 6.2pt; padding: 0.6pt 5pt; margin-left: 5pt; letter-spacing: .3pt; }
+  .gcab .der { font-weight: 400; font-size: 7.4pt; }
+  table.cuartel thead th { background: var(--verde-claro); font-size: 6.2pt; color: #444; text-transform: uppercase; padding: 2.4pt 5pt; text-align: left; border-bottom: 0.8pt solid var(--verde-borde); }
+  table.cuartel th.num, table.cuartel td.num { text-align: right; }
+  table.cuartel td { padding: 1.8pt 5pt; font-size: 8pt; vertical-align: top; }
+  table.cuartel td.cuartel { font-weight: 700; width: 29%; }
+  table.cuartel td.cuartel small { display: block; font-weight: 400; color: var(--gris); font-size: 6.4pt; text-transform: uppercase; }
+  table.cuartel td.ha { text-align: right; font-weight: 700; width: 6%; }
+  table.cuartel td.sacos { text-align: right; color: var(--naranja); font-weight: 700; }
+  table.cuartel tr.sep td { border-top: 0.8pt dotted var(--verde-borde); }
+  .gpie { background: var(--verde-claro); border-top: 0.8pt solid var(--verde-borde); padding: 3pt 8pt; font-size: 7pt; color: var(--gris); display: flex; gap: 14pt; align-items: flex-end; }
+  .gpie .l { display: inline-block; border-bottom: 0.8pt solid #4b4b4b; width: 48pt; height: 8pt; vertical-align: bottom; margin-left: 3pt; }
+  .gpie .l.ancho { width: 130pt; }
+
+  .bloque-pie { display: flex; gap: 9pt; margin-top: 8pt; page-break-inside: avoid; }
+  .epp { columns: 2; font-size: 8pt; }
+  .epp div { margin-bottom: 1.6pt; }
+  .prec { font-style: italic; font-size: 8pt; }
+  .obs { margin-top: 6pt; border: 1pt solid var(--verde-borde); background: var(--verde-claro); border-radius: 4pt; padding: 5pt 8pt 22pt; page-break-inside: avoid; }
+  .firmas { display: flex; gap: 22pt; margin-top: 22pt; page-break-inside: avoid; }
+  .firmas > div { flex: 1; text-align: center; border-top: 1.4pt solid #222; padding-top: 2pt; font-size: 8pt; }
+  .firmas b { display: block; }
+  .emitido { text-align: center; color: var(--gris); font-size: 6.8pt; margin-top: 12pt; }
+</style>
+</head>
+<body>
+{% macro es(v, d=1) -%}{{ ("{:,.%df}" % d).format(v|float).replace(",", "X").replace(".", ",").replace("X", ".") }}{%- endmacro %}
+{% set casetas_lista = casetas %}
+{% set nombre_caseta = caseta_filtrada or (casetas_lista[0].nombre if casetas_lista else "") %}
+
+<div class="cab">
+  <div>
+    <div class="razon">SOCIEDAD AGRÍCOLA LA HORNILLA LTDA.</div>
+    <div class="fundo">FUNDO {{ sucursal.sucursal }}</div>
+    <div class="sub">REGISTRO DE APLICACIONES · FERTILIZANTES AL SUELO · PAPELETA RESUMIDA PARA CASETERO</div>
+  </div>
+  <div class="orden">
+    <div class="eti">ORDEN N°</div>
+    <div class="num">{{ num_orden }}</div>
+    <div class="caseta">{{ nombre_caseta }}</div>
+  </div>
+</div>
+
+<div class="paneles">
+  <div class="panel">
+    <h3>ORDEN DE APLICACIÓN</h3>
+    <div class="campos">
+      <div class="campo"><div class="k">Fecha</div><div class="v">{{ periodo }}</div></div>
+      <div class="campo"><div class="k">Semana</div><div class="v">{{ semana.etiqueta_semana }}{% if semana.temporada %} · Temp {{ semana.temporada }}{% endif %}</div></div>
+      <div class="campo"><div class="k">Estado fenológico</div><div class="v">{{ etapas_txt }}</div></div>
+      <div class="campo"><div class="k">Especie</div><div class="v">{{ especies_txt }}</div></div>
+      <div class="campo"><div class="k">Método</div><div class="v">Vía riego</div></div>
+      <div class="campo"><div class="k">Objetivo</div><div class="v">Abono</div></div>
+    </div>
+  </div>
+  <div class="panel">
+    <h3>CONFIRMACIÓN DE APLICACIÓN</h3>
+    <div class="campos">
+      <div class="campo"><div class="k">Fecha inicio</div><div class="linea"></div></div>
+      <div class="campo"><div class="k">Fecha término</div><div class="linea"></div></div>
+      <div class="campo"><div class="k">Hora inicio</div><div class="linea"></div></div>
+      <div class="campo"><div class="k">Hora término</div><div class="linea"></div></div>
+      <div class="campo"><div class="k">Responsable</div><div class="v">{{ supervisor }}</div></div>
+      <div class="campo"><div class="k">Saco estándar</div><div class="v">{{ peso_saco_txt }} kg</div></div>
+    </div>
+  </div>
+</div>
+
+<div class="titulo-tabla">PRODUCTO A APLICAR · {{ nombre_caseta|upper }} · TOTAL {{ es(total_kg_campo, 1) }} KG</div>
+<table class="resumen">
+  <thead><tr>
+    <th>NOMBRE COMERCIAL</th><th>N-P-K</th><th class="num">KG TOTALES</th><th class="sacos">SACOS {{ peso_saco_txt }} KG</th>
+  </tr></thead>
+  <tbody>
+  {% for p in productos_resumen %}
+    <tr><td>{{ p.nombre }}</td><td class="npk">{{ p.npk }}</td><td class="num">{{ es(p.kg, 1) }}</td><td class="sacos">{{ es(p.sacos, 1) }}</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+
+{% for cas in casetas %}
+  {% for eq in cas.equipos %}
+    <div class="equipo">EQUIPO {{ eq.nombre|upper }}</div>
+    {% for sec in eq.sectores %}
+      <div class="grupo">
+        <div class="gcab">
+          <span>Grupo {{ sec.nombre }}{% if sec.etapa %}<span class="chip">{{ sec.etapa|upper }}</span>{% endif %}</span>
+          <span class="der">{{ sec.n_cuarteles }} cuartel{{ '' if sec.n_cuarteles == 1 else 'es' }} · {{ es(sec.sup, 2) }} ha</span>
+        </div>
+        <table class="cuartel">
+          <thead><tr>
+            <th>Cuartel</th><th class="num">Ha</th><th>Producto</th><th class="num">NPK</th>
+            <th class="num">Dosis<br>kg/ha</th><th class="num">Kg a<br>aplicar</th><th class="num">Sacos</th>
+          </tr></thead>
+          <tbody>
+          {% for c in sec.cuarteles %}
+            {% set cuartel_idx = loop.index0 %}
+            {% for p in c.productos %}
+              <tr{% if loop.first and cuartel_idx > 0 %} class="sep"{% endif %}>
+                {% if loop.first %}
+                  <td class="cuartel">{{ c.nombre }}<small>{{ c.variedad }}</small></td>
+                  <td class="ha">{{ es(c.sup_sector, 2) }}</td>
+                {% else %}<td></td><td></td>{% endif %}
+                <td>{{ p.nombre }}</td>
+                <td class="num">{{ p.npk }}</td>
+                <td class="num">{{ es(p.dosis, 1) }}</td>
+                <td class="num">{{ es(p.kg, 1) }}</td>
+                <td class="sacos">{{ es(p.sacos_dec, 1) }}</td>
+              </tr>
+            {% endfor %}
+          {% endfor %}
+          </tbody>
+        </table>
+        <div class="gpie">Inicio<span class="l"></span> Término<span class="l"></span> Obs.<span class="l ancho"></span></div>
+      </div>
+    {% endfor %}
+  {% endfor %}
+{% endfor %}
+
+<div class="bloque-pie">
+  <div class="panel">
+    <h3>EQUIPO DE PROTECCIÓN PERSONAL</h3>
+    <div class="epp">
+      <div>☐ Traje de goma</div><div>☐ Botas</div><div>☐ Mascarilla</div><div>☐ Antiparras</div><div>☐ Guantes</div><div>☐ Casco</div>
+    </div>
+  </div>
+  <div class="panel">
+    <h3>PRECAUCIONES ESPECIALES DE MANEJO</h3>
+    <div class="prec">Evitar aplicación cerca de cursos de agua. Respetar tercio del riego recomendado.</div>
+  </div>
+</div>
+<div class="obs"><h3 style="margin:0;font-size:7.4pt;letter-spacing:.5pt;color:var(--verde-osc);border-bottom:1pt solid var(--verde-borde);padding-bottom:2pt;">OBSERVACIONES GENERALES DE APLICACIÓN</h3></div>
+
+<div class="firmas">
+  <div>Recomienda<b>{{ recomienda }}</b></div>
+  <div>Nombre dosificador</div>
+  <div>Nombre aplicador</div>
+</div>
+<div class="emitido">Emitido {{ fecha_emision }} · Sociedad Agrícola La Hornilla Ltda. · Versión resumida ({{ nombre_caseta }})</div>
+</body>
+</html>
