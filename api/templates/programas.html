@@ -36,6 +36,9 @@
       </svg>
       Descargar
     </button>
+    <button type="button" class="filter-btn" id="papeleta-resumida" disabled title="Elige una caseta para descargar la papeleta resumida del casetero">
+      Resumida (casetero)
+    </button>
   </div>
 </div>
 
@@ -131,8 +134,17 @@
     const idSucursal = {{ filtro_sucursal | default('null') | tojson }};
     if (!selSem || !btn || !selCas) return;
 
+    const btnRes = document.getElementById('papeleta-resumida');
     function sync() {
       btn.disabled = !(idSucursal && selSem.value);
+      if (btnRes) btnRes.disabled = !(idSucursal && selSem.value && selCas.value);
+    }
+    if (btnRes) {
+      btnRes.addEventListener('click', () => {
+        if (!idSucursal || !selSem.value || !selCas.value) return;
+        window.open(`/papeleta-caseta-resumida/${encodeURIComponent(selSem.value)}/${idSucursal}/${selCas.value}`, '_blank');
+      });
+      selCas.addEventListener('change', sync);
     }
 
     async function cargarCasetas() {

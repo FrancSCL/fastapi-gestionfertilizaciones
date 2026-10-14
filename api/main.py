@@ -41,7 +41,7 @@ from .queries import (
     save_confirmacion_aplicacion, get_cuaderno_cuartel,
     deshacer_ultima_aplicacion, get_cuaderno_temporada,
 )
-from .pdf_service import build_pdf, build_pdf_bodega, build_pdf_campo
+from .pdf_service import build_pdf, build_pdf_bodega, build_pdf_campo, build_pdf_resumida
 
 app = FastAPI(title="LH Fertilizaciones")
 
@@ -2274,6 +2274,41 @@ def generar_papeleta_caseta(
     safe_cas = caseta["caseta"].replace(" ", "_")
     safe_sem = etiqueta_semana.replace(" ", "_")
     filename = f"papeleta_{safe_suc}_{safe_cas}_{safe_sem}.pdf"
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'inline; filename="{filename}"'},
+    )
+
+
+@app.get("/papeleta-caseta-resumida/{etiqueta_semana}/{id_sucursal}/{id_caseta}")
+def generar_papeleta_caseta_resumida(
+    request: Request, etiqueta_semana: str, id_sucursal: int, id_caseta: int,
+):
+    """Papeleta resumida para el casetero (formato Santa Ines): resumen de productos y bloques por equipo y grupo."""
+    permitidas = request.session.get("user_sucursales")
+    if permitidas is not None and id_sucursal not in set(permitidas):
+        raise HTTPException(status_code=403, detail="Sucursal no autorizada")
+    sucursal = get_sucursal_info(id_sucursal)
+    if not sucursal:
+        raise HTTPException(status_code=404, detail="Sucursal no encontrada")
+    caseta = get_caseta_info(id_caseta)
+    if not caseta or caseta["id_sucursal"] != id_sucursal:
+        raise HTTPException(status_code=404, detail="Caseta no encontrada en esta sucursal")
+    semana = get_semana_info(etiqueta_semana)
+    if not semana:
+        raise HTTPException(status_code=404, detail=f"Semana '{etiqueta_semana}' no encontrada")
+
+    rows = get_papeleta_campo_rows(etiqueta_semana, id_sucursal)
+    supervisor = request.session.get("user_name", "") if hasattr(request, "session") else ""
+    try:
+        pdf_bytes = build_pdf_resumida(rows, sucursal, semana, supervisor, id_caseta, caseta["caseta"])
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+    safe_suc = sucursal["sucursal"].replace(" ", "_")
+    safe_cas = caseta["caseta"].replace(" ", "_")
+    safe_sem = etiqueta_semana.replace(" ", "_")
+    filename = f"papeleta_{safe_suc}_{safe_cas}_{safe_sem}_resumida.pdf"
     return Response(
         content=pdf_bytes,
         media_type="application/pdf",

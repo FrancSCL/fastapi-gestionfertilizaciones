@@ -542,3 +542,145 @@ def build_pdf_bodega(etiqueta_semana: str, programas: list, productos_map: dict,
         resumen_global=resumen_global,
     )
     return HTML(string=html_str, base_url=str(TEMPLATES_DIR)).write_pdf()
+
+
+# ── Papeleta resumida para el casetero ────────────────────────────────────
+import re
+import unicodedata
+from collections import OrderedDict
+from typing import Any
+
+_UMBRAL_KG = 0.05
+PAPELETA_RECOMIENDA = "Benjamin Allendes"
+
+
+def _npk_texto(pct_n, pct_p, pct_k, separador: str = "-") -> str:
+    return separador.join(str(round(float(v or 0) * 100)) for v in (pct_n, pct_p, pct_k))
+
+
+def _periodo_resumida(inicio, fin, flecha: str = "–") -> str:
+    if inicio and fin:
+        return f"{inicio.strftime('%d/%m/%Y')} {flecha} {fin.strftime('%d/%m/%Y')}"
+    if inicio:
+        return inicio.strftime("%d/%m/%Y")
+    return ""
+
+
+def _sin_tildes(texto: str) -> str:
+    return unicodedata.normalize("NFD", texto or "").encode("ascii", "ignore").decode("ascii").upper()
+
+
+def _sigla(sucursal: dict[str, Any]) -> str:
+    """Iniciales de la sucursal (SANTA INES -> SI), que los nombres de caseta, equipo y sector llevan como sufijo."""
+    return "".join(p[0] for p in str(sucursal.get("sucursal", "")).split() if p).upper()
+
+
+def _nombre_corto(nombre: Any, sigla: str, prefijo: str = "") -> str:
+    texto = str(nombre or "").strip()
+    if prefijo:
+        texto = re.sub(rf"^{prefijo}\s+", "", texto, flags=re.IGNORECASE)
+    if sigla:
+        texto = re.sub(rf"\s+{re.escape(sigla)}$", "", texto, flags=re.IGNORECASE)
+    return texto
+
+
+def contexto_papeleta_resumida(
+    rows: list[dict[str, Any]],
+    sucursal: dict[str, Any],
+    semana: dict[str, Any],
+    supervisor: str,
+    id_caseta: str,
+    caseta_nombre: str,
+) -> dict[str, Any]:
+    """Papeleta resumida para el casetero: resumen de productos de la caseta y luego Equipo > Grupo (sector) > cuartel."""
+    peso = float(PESO_ENVASE_KG)
+    sigla = _sigla(sucursal)
+    equipos: OrderedDict[Any, dict[str, Any]] = OrderedDict()
+    resumen: dict[str, dict[str, Any]] = {}
+    especies: set[str] = set()
+    etapas: set[str] = set()
+    vistos: set[tuple[Any, ...]] = set()  # filas identicas repetidas (mismo producto cargado dos veces) cuentan una sola vez
+    for r in rows:
+        if str(r.get("id_caseta")) != str(id_caseta):
+            continue
+        clave = (r["id_sector"], r["id_cuartel"], r["etapa"], r["producto"], float(r["dosis_ha"] or 0))
+        if clave in vistos:
+            continue
+        vistos.add(clave)
+        sup = float(r["sup_sector_cuartel"] or 0)
+        dosis = float(r["dosis_ha"] or 0)
+        kg = dosis * sup
+        if kg < _UMBRAL_KG:
+            continue
+        npk = _npk_texto(r.get("pct_n"), r.get("pct_p"), r.get("pct_k"))
+        eq = equipos.setdefault((r["id_equipo"], r["equipo"]), {"nombre": str(r["equipo"]), "sectores": OrderedDict()})
+        sec = eq["sectores"].setdefault(
+            (r["id_sector"], r["sector"]), {"nombre": r["sector"], "cuarteles": OrderedDict(), "etapas": []}
+        )
+        cu = sec["cuarteles"].setdefault(
+            (r["id_cuartel"], r["etapa"] or "-"),
+            {"nombre": r["cuartel"], "variedad": r["variedad"], "sup_sector": sup, "productos": []},
+        )
+        cu["productos"].append(
+            {"nombre": r["producto"], "npk": npk, "dosis": dosis, "kg": kg, "sacos_dec": kg / peso}
+        )
+        if r.get("etapa") and r["etapa"] not in sec["etapas"]:
+            sec["etapas"].append(r["etapa"])
+        pr = resumen.setdefault(r["producto"], {"nombre": r["producto"], "npk": npk, "kg": 0.0})
+        pr["kg"] += kg
+        if r.get("especie"):
+            especies.add(r["especie"])
+        if r.get("etapa"):
+            etapas.add(r["etapa"])
+    equipos_list = []
+    for eq in equipos.values():
+        sectores = []
+        for sec in eq["sectores"].values():
+            cuarteles = list(sec["cuarteles"].values())
+            for c in cuarteles:
+                c["productos"].sort(key=lambda p: _sin_tildes(p["nombre"]))
+            sectores.append(
+                {
+                    "nombre": _nombre_corto(sec["nombre"], "", "sector"),
+                    "etapa": " / ".join(sec["etapas"]),
+                    "n_cuarteles": len(cuarteles),
+                    "sup": sum(c["sup_sector"] for c in cuarteles),
+                    "cuarteles": cuarteles,
+                }
+            )
+        equipos_list.append({"nombre": _nombre_corto(eq["nombre"], sigla, "equipo"), "sectores": sectores})
+    productos_resumen = [
+        {**p, "sacos": p["kg"] / peso} for p in sorted(resumen.values(), key=lambda x: x["nombre"])
+    ]
+    etiqueta = semana.get("etiqueta_semana", "")
+    return {
+        "sucursal": sucursal or {"sucursal": "-"},
+        "semana": semana or {},
+        "periodo": _periodo_resumida(semana.get("fecha_inicio"), semana.get("fecha_fin"), "–"),
+        "num_orden": f"{etiqueta} / {sucursal.get('sucursal', '')}" if sucursal else etiqueta,
+        "supervisor": supervisor,
+        "casetas": [{"nombre": caseta_nombre, "equipos": equipos_list}] if equipos_list else [],
+        "caseta_filtrada": caseta_nombre,
+        "productos_resumen": productos_resumen,
+        "total_kg_campo": sum(p["kg"] for p in productos_resumen),
+        "especies_txt": ", ".join(sorted(especies)) if especies else "-",
+        "etapas_txt": ", ".join(sorted(etapas)) if etapas else "-",
+        "peso_saco_txt": f"{peso:g}",
+        "recomienda": PAPELETA_RECOMIENDA,
+        "fecha_emision": date.today().strftime("%d/%m/%Y"),
+    }
+
+
+def build_pdf_resumida(
+    rows: list[dict[str, Any]],
+    sucursal: dict[str, Any],
+    semana: dict[str, Any],
+    supervisor: str,
+    id_caseta: str,
+    caseta_nombre: str,
+) -> bytes:
+    ctx = contexto_papeleta_resumida(rows, sucursal, semana, supervisor, id_caseta, caseta_nombre)
+    if not ctx["casetas"]:
+        raise ValueError("La caseta no tiene aplicaciones programadas esa semana")
+    html = _env.get_template("papeleta_resumida.html").render(**ctx)
+    return HTML(string=html, base_url=str(TEMPLATES_DIR)).write_pdf()
